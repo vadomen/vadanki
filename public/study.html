@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vadanki — Study</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <span id="deck-title" class="logo">Study</span>
+      <button id="end-btn" class="btn btn-ghost">← Back</button>
+    </header>
+
+    <main class="container study-container">
+      <div id="study-area">
+        <p id="progress" class="progress-text"></p>
+
+        <div id="study-card" class="study-card">
+          <div class="card-inner">
+            <div class="card-face face-front">
+              <p id="card-front-text" class="card-word"></p>
+              <p class="card-hint">tap or press <kbd>Space</kbd> to reveal</p>
+            </div>
+            <div class="card-face face-back">
+              <p id="card-back-text" class="card-translation"></p>
+              <p id="card-example" class="card-example"></p>
+            </div>
+          </div>
+        </div>
+
+        <button id="flip-btn" class="btn btn-outline btn-lg">
+          Show answer &nbsp;<kbd>Space</kbd>
+        </button>
+
+        <div id="grade-buttons" class="grade-buttons" hidden>
+          <button class="grade-btn grade-again" data-grade="again">
+            <span class="grade-label">Again</span><kbd>1</kbd>
+          </button>
+          <button class="grade-btn grade-hard" data-grade="hard">
+            <span class="grade-label">Hard</span><kbd>2</kbd>
+          </button>
+          <button class="grade-btn grade-good" data-grade="good">
+            <span class="grade-label">Good</span><kbd>3</kbd>
+          </button>
+          <button class="grade-btn grade-easy" data-grade="easy">
+            <span class="grade-label">Easy</span><kbd>4</kbd>
+          </button>
+        </div>
+      </div>
+
+      <div id="done-screen" class="done-screen" hidden>
+        <div class="done-card">
+          <p id="done-message" class="done-message"></p>
+          <a href="/decks.html" class="btn btn-primary btn-lg">Back to decks</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

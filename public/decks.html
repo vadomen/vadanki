@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vadanki — My Decks</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <a href="/decks.html" class="logo">Vadanki</a>
+      <button id="logout-btn" class="btn btn-ghost">Log out</button>
+    </header>
+
+    <main class="container">
+      <div class="page-header">
+        <h2>My Decks</h2>
+        <button id="new-deck-btn" class="btn btn-primary">+ New Deck</button>
+      </div>
+
+      <form id="new-deck-form" class="new-deck-form" hidden>
+        <h3>New deck</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Name</label>
+            <input class="input" name="name" placeholder="e.g. Spanish Verbs" required />
+          </div>
+          <div class="form-group">
+            <label>From</label>
+            <input class="input" name="sourceLang" value="en" placeholder="en" />
+          </div>
+          <div class="form-group">
+            <label>To</label>
+            <input class="input" name="targetLang" value="es" placeholder="es" />
+          </div>
+          <div class="form-group">
+            <label>New/day</label>
+            <input class="input" name="newPerDay" type="number" value="20" min="1" max="200" />
+          </div>
+        </div>
+        <p id="deck-error" class="error-msg" hidden></p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Create</button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onclick="document.getElementById('new-deck-form').hidden = true"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+
+      <div id="decks-list"><p class="loading">Loading…</p></div>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
