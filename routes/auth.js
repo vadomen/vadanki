@@ -13,11 +13,14 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: 'lax',
-  maxAge: 30 * 24 * 60 * 60 * 1000,
-};
+function cookieOpts(req) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: req.secure, // true on HTTPS (Render sets trust proxy above)
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  };
+}
 
 function signToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -32,7 +35,7 @@ router.post('/register', authLimiter, async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
   try {
     const user = await User.create({ email, passwordHash });
-    res.cookie('token', signToken(user._id), COOKIE_OPTS);
+    res.cookie('token', signToken(user._id), cookieOpts(req));
     res.status(201).json({ userId: user._id });
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'Email already registered' });
@@ -49,7 +52,7 @@ router.post('/login', authLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  res.cookie('token', signToken(user._id), COOKIE_OPTS);
+  res.cookie('token', signToken(user._id), cookieOpts(req));
   res.json({ userId: user._id });
 });
 
