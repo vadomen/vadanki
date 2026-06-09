@@ -1,7 +1,9 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import Deck from '../models/Deck.js';
 import Card from '../models/Card.js';
 import { requireAuth } from '../middleware/auth.js';
+import { translateWord } from '../services/geminiService.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -71,20 +73,38 @@ router.get('/:id/cards', async (req, res) => {
   res.json(cards);
 });
 
-// POST /api/decks/:id/cards — create card (Gemini wired in M4)
-router.post('/:id/cards', async (req, res) => {
+const cardCreateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// POST /api/decks/:id/cards — create card; calls Gemini for translation + example
+router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
   const deck = await Deck.findOne({ _id: req.params.id, userId: req.userId });
   if (!deck) return res.status(404).json({ error: 'Deck not found' });
 
   const { front, back, exampleSentence } = req.body ?? {};
   if (!front) return res.status(400).json({ error: 'front required' });
 
+  // Call Gemini only when back is not manually provided
+  let resolvedBack = back ?? '';
+  let resolvedExample = exampleSentence ?? '';
+  if (!resolvedBack && process.env.GEMINI_API_KEY) {
+    const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
+    if (ai) {
+      resolvedBack = ai.translation ?? '';
+      resolvedExample = ai.exampleSentence ?? '';
+    }
+  }
+
   const card = await Card.create({
     deckId: deck._id,
     userId: req.userId,
     front,
-    back: back ?? '',
-    exampleSentence: exampleSentence ?? '',
+    back: resolvedBack,
+    exampleSentence: resolvedExample,
   });
   res.status(201).json(card);
 });
