@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
+import authRouter from './routes/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,8 +18,7 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-// Route stubs — filled in future milestones
-// app.use('/api/auth', authRouter);
+app.use('/api/auth', authRouter);
 // app.use('/api/decks', decksRouter);
 // app.use('/api/cards', cardsRouter);
 // app.use('/api/study', studyRouter);
