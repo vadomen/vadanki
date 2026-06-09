@@ -468,7 +468,7 @@ body {
 .study-card {
   width: 100%;
   max-width: 520px;
-  height: 270px;
+  height: 300px;
   perspective: 1200px;
   cursor: pointer;
   margin-bottom: 1.75rem;
@@ -505,6 +505,9 @@ body {
 .face-back {
   transform: rotateY(180deg);
   background: #fafbff;
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding-top: 1.75rem;
 }
 
 .card-word {
@@ -519,27 +522,45 @@ body {
   margin-top: 0.75rem;
 }
 .card-translation {
-  font-size: 1.65rem;
-  font-weight: 700;
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  font-weight: 600;
   color: var(--primary);
-  line-height: 1.3;
-  margin-bottom: 0.75rem;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+}
+.card-translation b,
+.card-translation strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.card-translation i,
+.card-translation em {
+  display: block;
+  font-size: 0.85em;
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.4;
 }
 .card-example {
   font-size: 0.9rem;
   color: var(--muted);
   font-style: italic;
+  width: 100%;
+  text-align: center;
 }
 
 @media (max-width: 480px) {
   .study-card {
-    height: 220px;
+    height: 280px;
   }
   .card-word {
     font-size: 1.6rem;
   }
   .card-translation {
-    font-size: 1.3rem;
+    font-size: 1rem;
   }
 }
 

@@ -259,6 +259,13 @@ async function loadCards(deckId) {
   }
 }
 
+function stripHtml(html) {
+  return (html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function renderCardRows(cards) {
   if (!cards.length) return '<p class="empty" style="padding:.5rem 0">No cards yet.</p>';
   return cards
@@ -267,7 +274,7 @@ function renderCardRows(cards) {
     <div class="card-row">
       <span class="card-front-text">${esc(c.front)}</span>
       <span class="card-arrow">→</span>
-      <span class="card-back-text">${c.back ? esc(c.back) : '<em class="muted">no translation</em>'}</span>
+      <span class="card-back-text">${c.back ? esc(stripHtml(c.back)) : '<em class="muted">no translation</em>'}</span>
       <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}">✕</button>
     </div>`,
     )
@@ -361,7 +368,8 @@ function showCard() {
     rem + ' card' + (rem !== 1 ? 's' : '') + ' remaining';
 
   document.getElementById('card-front-text').textContent = card.front;
-  document.getElementById('card-back-text').textContent = card.back || '';
+  // back may contain HTML (e.g. imported as <b>translation</b><br><i>example</i>)
+  document.getElementById('card-back-text').innerHTML = card.back || '';
   const exEl = document.getElementById('card-example');
   exEl.textContent = card.exampleSentence || '';
   exEl.hidden = !card.exampleSentence;
