@@ -4,6 +4,7 @@ import Deck from '../models/Deck.js';
 import Card from '../models/Card.js';
 import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
+import { serializeCSV, parseCSV } from '../services/csv.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -107,6 +108,51 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     exampleSentence: resolvedExample,
   });
   res.status(201).json(card);
+});
+
+// GET /api/decks/:id/export.csv — download all cards as CSV
+router.get('/:id/export.csv', async (req, res) => {
+  const deck = await Deck.findOne({ _id: req.params.id, userId: req.userId });
+  if (!deck) return res.status(404).json({ error: 'Deck not found' });
+
+  const cards = await Card.find({ deckId: deck._id, userId: req.userId }).sort({ createdAt: 1 });
+  const csv = serializeCSV(cards);
+  const safeName = deck.name.replace(/[^a-z0-9_-]/gi, '_');
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.csv"`);
+  res.send(csv);
+});
+
+// POST /api/decks/:id/import — create cards from CSV body { csv: "..." }
+router.post('/:id/import', async (req, res) => {
+  const deck = await Deck.findOne({ _id: req.params.id, userId: req.userId });
+  if (!deck) return res.status(404).json({ error: 'Deck not found' });
+
+  const { csv } = req.body ?? {};
+  if (!csv || typeof csv !== 'string')
+    return res.status(400).json({ error: 'csv string required' });
+
+  const rows = parseCSV(csv);
+  if (rows.length === 0) return res.status(400).json({ error: 'CSV is empty' });
+
+  // Skip header row if present
+  const start = rows[0][0]?.toLowerCase().trim() === 'front' ? 1 : 0;
+  const dataRows = rows.slice(start).filter((r) => r[0]?.trim());
+
+  if (dataRows.length === 0) return res.status(400).json({ error: 'No valid rows found' });
+  if (dataRows.length > 1000) return res.status(400).json({ error: 'Max 1000 cards per import' });
+
+  const docs = dataRows.map(([front = '', back = '', exampleSentence = '']) => ({
+    deckId: deck._id,
+    userId: req.userId,
+    front: front.trim(),
+    back: back.trim(),
+    exampleSentence: exampleSentence.trim(),
+  }));
+
+  const cards = await Card.insertMany(docs);
+  res.status(201).json({ imported: cards.length });
 });
 
 export default router;

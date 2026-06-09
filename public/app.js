@@ -1,5 +1,3 @@
-/* global fetch, location, FormData, URLSearchParams, confirm, alert */
-
 // ── API helper ────────────────────────────────────────────────────────────────
 
 const api = {
@@ -189,6 +187,14 @@ async function loadCards(deckId) {
           <p class="add-hint">Leave translation blank and Gemini fills it in automatically.</p>
           <p class="add-status"></p>
         </form>
+        <div class="io-bar">
+          <a class="btn btn-ghost btn-sm" href="/api/decks/${deckId}/export.csv" download>↓ Export CSV</a>
+          <label class="btn btn-ghost btn-sm io-import-label">
+            ↑ Import CSV
+            <input type="file" accept=".csv,text/csv" class="import-input" />
+          </label>
+          <p class="import-status"></p>
+        </div>
         <div class="card-list" id="clist-${deckId}">${renderCardRows(cards)}</div>
       </div>`;
 
@@ -223,6 +229,31 @@ async function loadCards(deckId) {
     });
 
     attachDeleters(deckId);
+
+    panel.querySelector('.import-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = panel.querySelector('.import-status');
+      status.textContent = '⏳ Importing…';
+      try {
+        const csv = await file.text();
+        const result = await api.post('/api/decks/' + deckId + '/import', { csv });
+        status.textContent = `✅ Imported ${result.imported} card${result.imported !== 1 ? 's' : ''}`;
+        const updated = await api.get('/api/decks/' + deckId + '/cards');
+        if (updated) {
+          document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);
+          attachDeleters(deckId);
+          refreshDeckBadge(deckId, updated.length);
+        }
+        setTimeout(() => {
+          status.textContent = '';
+        }, 3000);
+      } catch (err) {
+        status.textContent = '❌ ' + err.message;
+      } finally {
+        e.target.value = '';
+      }
+    });
   } catch (err) {
     panel.innerHTML = `<p class="error-msg" style="padding:1.25rem">Error: ${esc(err.message)}</p>`;
   }
@@ -353,7 +384,9 @@ async function grade(g) {
   const card = queue[qIdx];
   try {
     await api.post('/api/study/' + card._id + '/review', { grade: g });
-  } catch (_) {}
+  } catch {
+    /* review POST failing is non-fatal */
+  }
   if (g === 'again' && !card._requeued) queue.push({ ...card, _requeued: true });
   qIdx++;
   showCard();

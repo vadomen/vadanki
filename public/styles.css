@@ -389,6 +389,29 @@ body {
   margin-top: 0.35rem;
 }
 
+.io-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.io-import-label {
+  cursor: pointer;
+}
+
+.io-import-label .import-input {
+  display: none;
+}
+
+.import-status {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .card-list {
   display: flex;
   flex-direction: column;
