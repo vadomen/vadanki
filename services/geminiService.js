@@ -10,8 +10,11 @@ export async function translateWord(word, sourceLang, targetLang) {
   try {
     const client = getClient();
     const prompt =
-      `Translate the ${sourceLang} word/phrase "${word}" to ${targetLang}. ` +
-      `Respond with JSON only, no markdown fences: {"translation":"...","exampleSentence":"..."}`;
+      `Translate the ${sourceLang} word/phrase "${word}" to ${targetLang}.\n` +
+      `Respond with JSON only, no markdown fences:\n` +
+      `{"translation":"2–4 synonyms or meanings in ${targetLang}, comma-separated","exampleSentence":"one natural example sentence in ${sourceLang} using the word"}\n` +
+      `The translation field must list 2–4 ${targetLang} synonyms separated by commas (or a slash for very close variants).\n` +
+      `The exampleSentence must be a realistic sentence in ${sourceLang} that shows the word used naturally in context.`;
 
     const result = await client.models.generateContent({
       model: 'gemini-2.5-flash',

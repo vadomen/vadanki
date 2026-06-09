@@ -91,12 +91,12 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
 
   // Call Gemini only when back is not manually provided
   let resolvedBack = back ?? '';
-  let resolvedExample = exampleSentence ?? '';
   if (!resolvedBack && process.env.GEMINI_API_KEY) {
     const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
-    if (ai) {
-      resolvedBack = ai.translation ?? '';
-      resolvedExample = ai.exampleSentence ?? '';
+    if (ai?.translation) {
+      const t = ai.translation.trim();
+      const ex = (ai.exampleSentence ?? '').trim();
+      resolvedBack = ex ? `<b>${t}</b><br><i>${ex}</i>` : `<b>${t}</b>`;
     }
   }
 
@@ -105,7 +105,7 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     userId: req.userId,
     front,
     back: resolvedBack,
-    exampleSentence: resolvedExample,
+    exampleSentence: exampleSentence ?? '',
   });
   res.status(201).json(card);
 });
