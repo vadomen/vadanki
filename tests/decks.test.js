@@ -141,4 +141,54 @@ describe('Cards CRUD', () => {
     const res = await request(app).get(`/api/decks/${deckId}/cards`).set('Cookie', cookie);
     expect(res.body).toHaveLength(0);
   });
+
+  it('finds existing cards by front or back text', async () => {
+    await request(app)
+      .post(`/api/decks/${deckId}/cards`)
+      .set('Cookie', cookie)
+      .send({ front: 'hello', back: 'hola' });
+    await request(app)
+      .post(`/api/decks/${deckId}/cards`)
+      .set('Cookie', cookie)
+      .send({ front: 'goodbye', back: 'adios' });
+
+    const byFront = await request(app)
+      .get('/api/cards/search?q=hel')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(byFront.body).toHaveLength(1);
+    expect(byFront.body[0].front).toBe('hello');
+    expect(byFront.body[0].deckName).toBe('Test Deck');
+
+    const byBack = await request(app)
+      .get('/api/cards/search?q=adios')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(byBack.body).toHaveLength(1);
+    expect(byBack.body[0].front).toBe('goodbye');
+  });
+
+  it('search ignores queries shorter than 2 chars', async () => {
+    const res = await request(app).get('/api/cards/search?q=a').set('Cookie', cookie).expect(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it("search does not return another user's cards", async () => {
+    await request(app)
+      .post(`/api/decks/${deckId}/cards`)
+      .set('Cookie', cookie)
+      .send({ front: 'secret', back: 'secreto' });
+
+    const otherCookie = (
+      await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'other@example.com', password: 'password123' })
+    ).headers['set-cookie'];
+
+    const res = await request(app)
+      .get('/api/cards/search?q=secret')
+      .set('Cookie', otherCookie)
+      .expect(200);
+    expect(res.body).toEqual([]);
+  });
 });

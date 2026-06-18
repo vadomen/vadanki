@@ -180,10 +180,11 @@ async function loadCards(deckId) {
       <div class="panel-inner">
         <form class="add-card-form">
           <div class="form-row">
-            <input class="input" name="front" placeholder="Word / phrase (front)" required />
+            <input class="input" name="front" placeholder="Word / phrase (front)" required autocomplete="off" />
             <input class="input" name="back"  placeholder="Translation — blank to use AI" />
             <button type="submit" class="btn btn-primary">Add</button>
           </div>
+          <div class="card-search-results" hidden></div>
           <p class="add-hint">Leave translation blank and Gemini fills it in automatically.</p>
           <p class="add-status"></p>
         </form>
@@ -211,6 +212,9 @@ async function loadCards(deckId) {
           back: fd.get('back'),
         });
         e.target.reset();
+        const resultsBox = e.target.querySelector('.card-search-results');
+        resultsBox.hidden = true;
+        resultsBox.innerHTML = '';
         status.textContent = '✅ Card added!';
         const updated = await api.get('/api/decks/' + deckId + '/cards');
         if (updated) {
@@ -229,6 +233,55 @@ async function loadCards(deckId) {
     });
 
     attachDeleters(deckId);
+
+    // Live-search the user's existing cards while typing the front, to spot duplicates.
+    const frontInput = panel.querySelector('.add-card-form [name="front"]');
+    const resultsBox = panel.querySelector('.card-search-results');
+    let searchTimer;
+    let searchSeq = 0;
+    frontInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = frontInput.value.trim();
+      if (q.length < 2) {
+        resultsBox.hidden = true;
+        resultsBox.innerHTML = '';
+        return;
+      }
+      searchTimer = setTimeout(async () => {
+        const seq = ++searchSeq;
+        const matches = await api.get('/api/cards/search?q=' + encodeURIComponent(q));
+        // Ignore stale responses that resolved out of order.
+        if (seq !== searchSeq || !matches) return;
+        if (!matches.length) {
+          resultsBox.hidden = true;
+          resultsBox.innerHTML = '';
+          return;
+        }
+        resultsBox.innerHTML =
+          `<p class="card-search-label">Existing cards (${matches.length}):</p>` +
+          matches
+            .map(
+              (m) => `
+        <div class="card-search-item">
+          <span class="card-search-front">${esc(m.front)}</span>
+          <span class="card-arrow">→</span>
+          <span class="card-search-back">${m.back ? esc(stripHtml(m.back)) : '<em class="muted">no translation</em>'}</span>
+          <span class="card-search-deck${m.deckId === deckId ? ' is-current' : ''}">${m.deckId === deckId ? 'this deck' : esc(m.deckName)}</span>
+        </div>`,
+            )
+            .join('');
+        resultsBox.hidden = false;
+      }, 250);
+    });
+    frontInput.addEventListener('blur', () => {
+      // Delay so a click inside the results can still register before hiding.
+      setTimeout(() => {
+        resultsBox.hidden = true;
+      }, 150);
+    });
+    frontInput.addEventListener('focus', () => {
+      if (resultsBox.innerHTML) resultsBox.hidden = false;
+    });
 
     panel.querySelector('.import-input').addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -259,6 +312,86 @@ async function loadCards(deckId) {
   }
 }
 
+async function showEditCardModal(cardId) {
+  // First, get the card details
+  const card = await api.get('/api/cards/' + cardId);
+  if (!card) {
+    alert('Card not found');
+    return;
+  }
+
+  // Create modal HTML
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Card</h3>
+        <button class="btn btn-ghost modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="edit-front">Front (Word/Phrase):</label>
+          <input type="text" id="edit-front" class="input" value="${esc(card.front)}" readonly />
+        </div>
+        <div class="form-group">
+          <label for="edit-back">Back (Translation):</label>
+          <textarea id="edit-back" class="input" rows="3">${esc(card.back)}</textarea>
+        </div>
+        <div class="form-group">
+          <label for="edit-example">Example Sentence:</label>
+          <textarea id="edit-example" class="input" rows="2">${esc(card.exampleSentence)}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button class="btn btn-primary modal-save">Save Changes</button>
+      </div>
+    </div>
+  `;
+
+  // Add modal to page
+  document.body.appendChild(modal);
+
+  // Handle modal events
+  modal.querySelector('.modal-close').addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  modal.querySelector('.modal-cancel').addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  modal.querySelector('.modal-save').addEventListener('click', async () => {
+    const front = document.getElementById('edit-front').value;
+    const back = document.getElementById('edit-back').value;
+    const example = document.getElementById('edit-example').value;
+
+    try {
+      await api.patch('/api/cards/' + cardId, { front, back, exampleSentence: example });
+      document.body.removeChild(modal);
+      // Refresh the card list
+      const deckId = new URLSearchParams(location.search).get('deck');
+      if (deckId) {
+        const updated = await api.get('/api/decks/' + deckId + '/cards');
+        if (updated) {
+          document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);
+          attachDeleters(deckId);
+        }
+      }
+    } catch (err) {
+      alert('Error saving card: ' + err.message);
+    }
+  });
+
+  // Close modal when clicking outside
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+}
+
 function stripHtml(html) {
   return (html || '')
     .replace(/<[^>]*>/g, ' ')
@@ -275,6 +408,7 @@ function renderCardRows(cards) {
       <span class="card-front-text">${esc(c.front)}</span>
       <span class="card-arrow">→</span>
       <span class="card-back-text">${c.back ? esc(stripHtml(c.back)) : '<em class="muted">no translation</em>'}</span>
+      <button class="btn btn-sm btn-ghost edit-card-btn" data-id="${c._id}">✏️</button>
       <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}">✕</button>
     </div>`,
     )
@@ -300,6 +434,15 @@ function attachDeleters(deckId) {
           alert(err.message);
           btn.disabled = false;
         }
+      }),
+    );
+
+  document
+    .getElementById('clist-' + deckId)
+    .querySelectorAll('.edit-card-btn')
+    .forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        await showEditCardModal(btn.dataset.id);
       }),
     );
 }

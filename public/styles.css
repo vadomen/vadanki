@@ -651,3 +651,101 @@ body {
   margin-bottom: 1.5rem;
   color: var(--text);
 }
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 1rem;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  padding: 0.75rem 1.5rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Existing-card search results (shown while adding a card) */
+.card-search-results {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.card-search-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0.1rem 0.25rem 0.25rem;
+}
+.card-search-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.card-search-front {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.card-search-back {
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-search-deck {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--card, #fff);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+.card-search-deck.is-current {
+  color: #b45309;
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
