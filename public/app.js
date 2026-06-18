@@ -392,6 +392,55 @@ async function showEditCardModal(cardId) {
   });
 }
 
+// Preview a card exactly as it appears during study: a flippable 3D card.
+async function showPreviewCardModal(cardId) {
+  const card = await api.get('/api/cards/' + cardId);
+  if (!card) {
+    alert('Card not found');
+    return;
+  }
+
+  const example = card.exampleSentence
+    ? `<p class="card-example">${esc(card.exampleSentence)}</p>`
+    : '';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content modal-preview">
+      <div class="modal-header">
+        <h3>Preview</h3>
+        <button class="btn btn-ghost modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="study-card preview-card">
+          <div class="card-inner">
+            <div class="card-face face-front">
+              <p class="card-word">${esc(card.front)}</p>
+              <p class="card-hint">tap to flip</p>
+            </div>
+            <div class="card-face face-back">
+              <p class="card-translation">${card.back || '<em class="muted">no translation</em>'}</p>
+              ${example}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  const close = () => document.body.removeChild(modal);
+
+  const previewCard = modal.querySelector('.preview-card');
+  previewCard.addEventListener('click', () => previewCard.classList.toggle('flipped'));
+
+  modal.querySelector('.modal-close').addEventListener('click', close);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
+}
+
 function stripHtml(html) {
   return (html || '')
     .replace(/<[^>]*>/g, ' ')
@@ -408,6 +457,7 @@ function renderCardRows(cards) {
       <span class="card-front-text">${esc(c.front)}</span>
       <span class="card-arrow">→</span>
       <span class="card-back-text">${c.back ? esc(stripHtml(c.back)) : '<em class="muted">no translation</em>'}</span>
+      <button class="btn btn-sm btn-ghost preview-card-btn" data-id="${c._id}" title="Preview">👁</button>
       <button class="btn btn-sm btn-ghost edit-card-btn" data-id="${c._id}">✏️</button>
       <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}">✕</button>
     </div>`,
@@ -443,6 +493,15 @@ function attachDeleters(deckId) {
     .forEach((btn) =>
       btn.addEventListener('click', async () => {
         await showEditCardModal(btn.dataset.id);
+      }),
+    );
+
+  document
+    .getElementById('clist-' + deckId)
+    .querySelectorAll('.preview-card-btn')
+    .forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        await showPreviewCardModal(btn.dataset.id);
       }),
     );
 }
