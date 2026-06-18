@@ -18,6 +18,7 @@ const api = {
   },
   get: (path) => api.req(path),
   post: (path, body) => api.req(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: (path, body) => api.req(path, { method: 'PATCH', body: JSON.stringify(body) }),
   del: (path) => api.req(path, { method: 'DELETE' }),
 };
 
