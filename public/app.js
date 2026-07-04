@@ -82,6 +82,26 @@ async function initAuth() {
 
   const errEl = document.getElementById('auth-error');
 
+  // Cloudflare Turnstile on the register form — only when the server has a
+  // site key configured; otherwise registration works without it.
+  let turnstileWidgetId = null;
+  api
+    .get('/api/auth/config')
+    .then((config) => {
+      if (!config?.turnstileSiteKey) return;
+      window.onTurnstileLoad = () => {
+        turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
+          sitekey: config.turnstileSiteKey,
+        });
+      };
+      const s = document.createElement('script');
+      s.src =
+        'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad&render=explicit';
+      s.async = true;
+      document.head.appendChild(s);
+    })
+    .catch(() => {});
+
   document.querySelectorAll('.tab-btn').forEach((tab) =>
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach((t) => t.classList.toggle('active', t === tab));
@@ -100,15 +120,20 @@ async function initAuth() {
       const btn = e.target.querySelector('[type="submit"]');
       btn.disabled = true;
       try {
-        await api.post('/api/auth/' + action, {
-          email: fd.get('email'),
-          password: fd.get('password'),
-        });
+        const body = { email: fd.get('email'), password: fd.get('password') };
+        if (action === 'register' && turnstileWidgetId !== null) {
+          body.turnstileToken = window.turnstile.getResponse(turnstileWidgetId);
+        }
+        await api.post('/api/auth/' + action, body);
         location.href = '/decks.html';
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
         btn.disabled = false;
+        // Tokens are single-use — issue a fresh challenge for the retry
+        if (action === 'register' && turnstileWidgetId !== null) {
+          window.turnstile.reset(turnstileWidgetId);
+        }
       }
     });
   });

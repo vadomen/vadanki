@@ -37,11 +37,37 @@ function signToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
+// Cloudflare Turnstile bot check on registration. Without TURNSTILE_SECRET_KEY
+// (local dev, tests) registration stays open; with it, fail closed.
+async function verifyTurnstile(token, ip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return true;
+  if (!token) return false;
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret, response: token, remoteip: ip }),
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// Public config the static frontend needs before login (no secrets here).
+router.get('/config', (_req, res) => {
+  res.json({ turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? null });
+});
+
 router.post('/register', authLimiter, registerLimiter, async (req, res) => {
-  const { email, password } = req.body ?? {};
+  const { email, password, turnstileToken } = req.body ?? {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   if (password.length < 8)
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!(await verifyTurnstile(turnstileToken, req.ip)))
+    return res.status(400).json({ error: 'CAPTCHA verification failed — please try again' });
 
   const passwordHash = await bcrypt.hash(password, 12);
   try {

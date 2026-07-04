@@ -847,3 +847,10 @@ body {
 .admin-no-decks {
   margin-top: 0.85rem;
 }
+
+/* Turnstile widget in the register form */
+.turnstile-widget:not(:empty) {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
+}
