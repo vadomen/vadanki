@@ -41,6 +41,35 @@ function speak(text, lang) {
   speechSynthesis.speak(utterance);
 }
 
+// ── Modal helper ──────────────────────────────────────────────────────────────
+
+// Mounts the modal, wires close/cancel/outside-click/Escape, focuses the first
+// editable field. Returns the close function.
+function setupModal(modal) {
+  document.body.appendChild(modal);
+
+  const onEsc = (e) => {
+    if (e.key === 'Escape') close();
+  };
+  const close = () => {
+    modal.remove();
+    document.removeEventListener('keydown', onEsc);
+  };
+  document.addEventListener('keydown', onEsc);
+
+  modal
+    .querySelectorAll('.modal-close, .modal-cancel')
+    .forEach((b) => b.addEventListener('click', close));
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
+
+  const first = modal.querySelector('input:not([readonly]), textarea');
+  if (first) first.focus();
+
+  return close;
+}
+
 // ── Auth page ─────────────────────────────────────────────────────────────────
 
 async function initAuth() {
@@ -97,6 +126,11 @@ async function initDecks() {
   document.getElementById('new-deck-btn').addEventListener('click', () => {
     newForm.hidden = !newForm.hidden;
     if (!newForm.hidden) newForm.querySelector('[name="name"]').focus();
+  });
+  document.getElementById('cancel-deck-btn').addEventListener('click', () => {
+    newForm.reset();
+    newForm.hidden = true;
+    document.getElementById('deck-error').hidden = true;
   });
 
   newForm.addEventListener('submit', async (e) => {
@@ -220,14 +254,7 @@ function showEditDeckModal(deck) {
     </div>
   `;
 
-  document.body.appendChild(modal);
-  const close = () => document.body.removeChild(modal);
-
-  modal.querySelector('.modal-close').addEventListener('click', close);
-  modal.querySelector('.modal-cancel').addEventListener('click', close);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
+  const close = setupModal(modal);
 
   modal.querySelector('.modal-save').addEventListener('click', async () => {
     const errEl = modal.querySelector('.edit-deck-error');
@@ -412,27 +439,25 @@ async function loadCards(deckId) {
   }
 }
 
-async function showEditCardModal(cardId) {
-  // First, get the card details
+async function showEditCardModal(cardId, deckId) {
   const card = await api.get('/api/cards/' + cardId);
   if (!card) {
     alert('Card not found');
     return;
   }
 
-  // Create modal HTML
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.innerHTML = `
     <div class="modal-content">
       <div class="modal-header">
         <h3>Edit Card</h3>
-        <button class="btn btn-ghost modal-close">&times;</button>
+        <button class="btn btn-ghost modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label for="edit-front">Front (Word/Phrase):</label>
-          <input type="text" id="edit-front" class="input" value="${esc(card.front)}" readonly />
+          <input type="text" id="edit-front" class="input" value="${esc(card.front)}" required />
         </div>
         <div class="form-group">
           <label for="edit-back">Back (Translation):</label>
@@ -442,6 +467,7 @@ async function showEditCardModal(cardId) {
           <label for="edit-example">Example Sentence:</label>
           <textarea id="edit-example" class="input" rows="2">${esc(card.exampleSentence)}</textarea>
         </div>
+        <p class="error-msg edit-card-error" hidden></p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost modal-cancel">Cancel</button>
@@ -450,44 +476,35 @@ async function showEditCardModal(cardId) {
     </div>
   `;
 
-  // Add modal to page
-  document.body.appendChild(modal);
-
-  // Handle modal events
-  modal.querySelector('.modal-close').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
-
-  modal.querySelector('.modal-cancel').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
+  const close = setupModal(modal);
 
   modal.querySelector('.modal-save').addEventListener('click', async () => {
-    const front = document.getElementById('edit-front').value;
-    const back = document.getElementById('edit-back').value;
-    const example = document.getElementById('edit-example').value;
+    const errEl = modal.querySelector('.edit-card-error');
+    errEl.hidden = true;
 
+    const front = modal.querySelector('#edit-front').value.trim();
+    if (!front) {
+      errEl.textContent = 'Front is required';
+      errEl.hidden = false;
+      return;
+    }
+    const back = modal.querySelector('#edit-back').value;
+    const example = modal.querySelector('#edit-example').value;
+
+    const btn = modal.querySelector('.modal-save');
+    btn.disabled = true;
     try {
       await api.patch('/api/cards/' + cardId, { front, back, exampleSentence: example });
-      document.body.removeChild(modal);
-      // Refresh the card list
-      const deckId = new URLSearchParams(location.search).get('deck');
-      if (deckId) {
-        const updated = await api.get('/api/decks/' + deckId + '/cards');
-        if (updated) {
-          document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);
-          attachDeleters(deckId);
-        }
+      close();
+      const updated = await api.get('/api/decks/' + deckId + '/cards');
+      if (updated) {
+        document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);
+        attachDeleters(deckId);
       }
     } catch (err) {
-      alert('Error saving card: ' + err.message);
-    }
-  });
-
-  // Close modal when clicking outside
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      document.body.removeChild(modal);
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+      btn.disabled = false;
     }
   });
 }
@@ -529,16 +546,10 @@ async function showPreviewCardModal(cardId) {
     </div>
   `;
 
-  document.body.appendChild(modal);
-  const close = () => document.body.removeChild(modal);
+  setupModal(modal);
 
   const previewCard = modal.querySelector('.preview-card');
   previewCard.addEventListener('click', () => previewCard.classList.toggle('flipped'));
-
-  modal.querySelector('.modal-close').addEventListener('click', close);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
 }
 
 function stripHtml(html) {
@@ -557,10 +568,10 @@ function renderCardRows(cards) {
       <span class="card-front-text">${esc(c.front)}</span>
       <span class="card-arrow">→</span>
       <span class="card-back-text">${c.back ? esc(stripHtml(c.back)) : '<em class="muted">no translation</em>'}</span>
-      <button class="btn btn-sm btn-ghost speak-card-btn" data-front="${esc(c.front)}" title="Pronounce">🔊</button>
-      <button class="btn btn-sm btn-ghost preview-card-btn" data-id="${c._id}" title="Preview">👁</button>
-      <button class="btn btn-sm btn-ghost edit-card-btn" data-id="${c._id}">✏️</button>
-      <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}">✕</button>
+      <button class="btn btn-sm btn-ghost speak-card-btn" data-front="${esc(c.front)}" title="Pronounce" aria-label="Pronounce">🔊</button>
+      <button class="btn btn-sm btn-ghost preview-card-btn" data-id="${c._id}" title="Preview" aria-label="Preview card">👁</button>
+      <button class="btn btn-sm btn-ghost edit-card-btn" data-id="${c._id}" title="Edit" aria-label="Edit card">✏️</button>
+      <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}" title="Delete" aria-label="Delete card">✕</button>
     </div>`,
     )
     .join('');
@@ -572,6 +583,7 @@ function attachDeleters(deckId) {
     .querySelectorAll('.del-card-btn')
     .forEach((btn) =>
       btn.addEventListener('click', async () => {
+        if (!confirm('Delete this card?')) return;
         btn.disabled = true;
         try {
           await api.del('/api/cards/' + btn.dataset.id);
@@ -593,7 +605,7 @@ function attachDeleters(deckId) {
     .querySelectorAll('.edit-card-btn')
     .forEach((btn) =>
       btn.addEventListener('click', async () => {
-        await showEditCardModal(btn.dataset.id);
+        await showEditCardModal(btn.dataset.id, deckId);
       }),
     );
 
@@ -649,6 +661,7 @@ async function initStudy() {
 
   document.getElementById('deck-title').textContent = params.get('name') || 'Study';
   document.getElementById('end-btn').addEventListener('click', () => {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
     location.href = '/decks.html';
   });
   document.getElementById('study-card').addEventListener('click', reveal);
@@ -712,8 +725,13 @@ function reveal() {
   document.getElementById('grade-buttons').hidden = false;
 }
 
+let grading = false;
+
 async function grade(g) {
-  if (!flipped) return;
+  // The guard prevents a rapid double click/keypress from posting two reviews
+  // for the same card and skipping the next one.
+  if (!flipped || grading) return;
+  grading = true;
   const card = queue[qIdx];
   try {
     await api.post('/api/study/' + card._id + '/review', { grade: g });
@@ -722,6 +740,7 @@ async function grade(g) {
   }
   if (g === 'again' && !card._requeued) queue.push({ ...card, _requeued: true });
   qIdx++;
+  grading = false;
   showCard();
 }
 
@@ -737,6 +756,7 @@ function onKey(e) {
 }
 
 function done(wasEmpty) {
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
   document.getElementById('study-area').hidden = true;
   document.getElementById('done-screen').hidden = false;
   document.getElementById('done-message').textContent = wasEmpty

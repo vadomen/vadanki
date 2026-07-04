@@ -319,6 +319,10 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+.deck-info {
+  min-width: 0;
 }
 
 .deck-name {
@@ -357,6 +361,7 @@ body {
   display: flex;
   gap: 0.35rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .cards-panel {
@@ -430,6 +435,10 @@ body {
 }
 .card-front-text {
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .card-arrow {
   color: var(--muted);
@@ -701,6 +710,10 @@ body {
 
 .modal-body {
   padding: 1.5rem;
+}
+.modal-body .form-group + .form-group,
+.modal-body .error-msg {
+  margin-top: 1rem;
 }
 
 .modal-footer {
