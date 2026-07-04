@@ -1,12 +1,17 @@
 import mongoose from 'mongoose';
 
+// Pasted/imported text often carries non-breaking spaces as a literal
+// "&nbsp;" entity or a U+00A0 character — normalize both to plain spaces.
+const cleanText = (s) =>
+  typeof s === 'string' ? s.replace(/&nbsp;?/gi, ' ').replace(/\u00A0/g, ' ') : s;
+
 const cardSchema = new mongoose.Schema(
   {
     deckId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deck', required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    front: { type: String, required: true, trim: true },
-    back: { type: String, default: '', trim: true },
-    exampleSentence: { type: String, default: '', trim: true },
+    front: { type: String, required: true, trim: true, set: cleanText },
+    back: { type: String, default: '', trim: true, set: cleanText },
+    exampleSentence: { type: String, default: '', trim: true, set: cleanText },
     ease: { type: Number, default: 2.5 },
     interval: { type: Number, default: 0 },
     repetitions: { type: Number, default: 0 },

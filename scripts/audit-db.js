@@ -41,6 +41,12 @@ for (const c of cards) {
     add('cards: back is "null"/"undefined" text', id);
   if (/\b(undefined|null)\b/.test(c.back ?? '') && /<b>/.test(c.back ?? ''))
     add('cards: AI artifact in back', `${id} (${c.back.slice(0, 60)})`);
+  // back legitimately holds HTML (entities render fine there) - only flag nbsp.
+  for (const f of ['front', 'exampleSentence']) {
+    if (/&(nbsp|amp|lt|gt|quot|#\d+);/i.test(c[f] ?? '') || /\u00A0/.test(c[f] ?? ''))
+      add(`cards: HTML entity or nbsp in ${f}`, `${id} (${(c[f] ?? '').slice(0, 40)})`);
+  }
+  if (/&nbsp;|\u00A0/.test(c.back ?? '')) add('cards: nbsp in back', id);
   if (typeof c.ease !== 'number' || c.ease < 1.3) add('cards: ease below 1.3', `${id} (${c.ease})`);
   if (typeof c.repetitions !== 'number' || c.repetitions < 0)
     add('cards: negative/missing repetitions', `${id} (${c.repetitions})`);

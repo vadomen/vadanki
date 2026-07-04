@@ -553,10 +553,12 @@ async function showPreviewCardModal(cardId) {
 }
 
 function stripHtml(html) {
-  return (html || '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Remove tags first, then decode entities (&nbsp; &amp; …) via an inert
+  // textarea — nothing executes, and decoded text renders as plain characters.
+  const text = (html || '').replace(/<[^>]*>/g, ' ');
+  const ta = document.createElement('textarea');
+  ta.innerHTML = text;
+  return ta.value.replace(/\s+/g, ' ').trim();
 }
 
 function renderCardRows(cards) {
