@@ -44,7 +44,11 @@ router.get('/:deckId', async (req, res) => {
     .sort({ createdAt: 1 })
     .limit(newSlots);
 
-  res.json({ due, new: newCards });
+  res.json({
+    due,
+    new: newCards,
+    deck: { sourceLang: deck.sourceLang, targetLang: deck.targetLang },
+  });
 });
 
 // POST /api/study/:cardId/review — grade a card

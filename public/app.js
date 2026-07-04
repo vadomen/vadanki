@@ -29,6 +29,18 @@ const esc = (s) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
+// ── Text-to-speech ────────────────────────────────────────────────────────────
+
+function speak(text, lang) {
+  if (!('speechSynthesis' in window)) return;
+  const clean = (text || '').trim();
+  if (!clean) return;
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = lang || 'en';
+  speechSynthesis.speak(utterance);
+}
+
 // ── Auth page ─────────────────────────────────────────────────────────────────
 
 async function initAuth() {
@@ -115,10 +127,13 @@ async function initDecks() {
   await loadDecks();
 }
 
+let decksById = {};
+
 async function loadDecks() {
   const list = document.getElementById('decks-list');
   const decks = await api.get('/api/decks');
   if (!decks) return;
+  decksById = Object.fromEntries(decks.map((d) => [d._id, d]));
 
   if (decks.length === 0) {
     list.innerHTML = '<p class="empty">No decks yet — create your first one above.</p>';
@@ -542,6 +557,7 @@ function renderCardRows(cards) {
       <span class="card-front-text">${esc(c.front)}</span>
       <span class="card-arrow">→</span>
       <span class="card-back-text">${c.back ? esc(stripHtml(c.back)) : '<em class="muted">no translation</em>'}</span>
+      <button class="btn btn-sm btn-ghost speak-card-btn" data-front="${esc(c.front)}" title="Pronounce">🔊</button>
       <button class="btn btn-sm btn-ghost preview-card-btn" data-id="${c._id}" title="Preview">👁</button>
       <button class="btn btn-sm btn-ghost edit-card-btn" data-id="${c._id}">✏️</button>
       <button class="btn btn-sm btn-ghost btn-danger-hover del-card-btn" data-id="${c._id}">✕</button>
@@ -589,6 +605,13 @@ function attachDeleters(deckId) {
         await showPreviewCardModal(btn.dataset.id);
       }),
     );
+
+  document
+    .getElementById('clist-' + deckId)
+    .querySelectorAll('.speak-card-btn')
+    .forEach((btn) =>
+      btn.addEventListener('click', () => speak(btn.dataset.front, decksById[deckId]?.sourceLang)),
+    );
 }
 
 function refreshDeckBadge(deckId, total) {
@@ -614,6 +637,7 @@ async function deleteDeck(deckId, el) {
 let queue = [];
 let qIdx = 0;
 let flipped = false;
+let studyLangs = {};
 
 async function initStudy() {
   const params = new URLSearchParams(location.search);
@@ -634,15 +658,29 @@ async function initStudy() {
     .forEach((b) => b.addEventListener('click', () => grade(b.dataset.grade)));
   document.addEventListener('keydown', onKey);
 
+  document.getElementById('speak-front-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    speak(queue[qIdx]?.front, studyLangs.sourceLang);
+  });
+  document.getElementById('speak-back-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const card = queue[qIdx];
+    if (!card) return;
+    const example = card.exampleSentence ? '. ' + card.exampleSentence : '';
+    speak(stripHtml(card.back) + example, studyLangs.targetLang);
+  });
+
   const data = await api.get('/api/study/' + deckId);
   if (!data) return;
 
+  studyLangs = data.deck ?? {};
   queue = [...data.due, ...data.new];
   qIdx = 0;
   queue.length === 0 ? done(true) : showCard();
 }
 
 function showCard() {
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
   if (qIdx >= queue.length) {
     done(false);
     return;

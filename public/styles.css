@@ -521,6 +521,20 @@ body {
   color: var(--muted);
   margin-top: 0.75rem;
 }
+.speak-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.speak-btn:hover {
+  opacity: 1;
+}
 .card-translation {
   font-size: clamp(1rem, 3vw, 1.4rem);
   font-weight: 600;
