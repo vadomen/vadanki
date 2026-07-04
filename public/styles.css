@@ -803,3 +803,47 @@ body {
 .preview-card .card-hint {
   margin-top: 1rem;
 }
+
+/* Admin page */
+.container-wide {
+  max-width: 900px;
+}
+.admin-user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.badge-admin {
+  padding: 0.15rem 0.55rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #ebf4ff;
+  color: var(--primary);
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+.admin-deck-list {
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.admin-deck-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.admin-deck-row:last-child {
+  border-bottom: none;
+}
+.admin-deck-row .card-front-text {
+  flex: 1;
+  font-weight: 500;
+}
+.admin-no-decks {
+  margin-top: 0.85rem;
+}

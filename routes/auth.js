@@ -63,9 +63,15 @@ router.post('/logout', (_req, res) => {
 });
 
 router.get('/me', requireAuth, async (req, res) => {
-  const user = await User.findById(req.userId).select('email name createdAt');
+  const user = await User.findById(req.userId).select('email name isAdmin createdAt');
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ userId: user._id, email: user.email, name: user.name, createdAt: user.createdAt });
+  res.json({
+    userId: user._id,
+    email: user.email,
+    name: user.name,
+    isAdmin: user.isAdmin,
+    createdAt: user.createdAt,
+  });
 });
 
 router.patch('/me', requireAuth, authLimiter, async (req, res) => {

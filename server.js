@@ -8,6 +8,7 @@ import authRouter from './routes/auth.js';
 import decksRouter from './routes/decks.js';
 import cardsRouter from './routes/cards.js';
 import studyRouter from './routes/study.js';
+import adminRouter from './routes/admin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/decks', decksRouter);
 app.use('/api/cards', cardsRouter);
 app.use('/api/study', studyRouter);
+app.use('/api/admin', adminRouter);
 
 const PORT = process.env.PORT ?? 3000;
 

@@ -124,6 +124,14 @@ async function initDecks() {
 
   document.getElementById('profile-btn').addEventListener('click', showProfileModal);
 
+  // Reveal the Admin link for admins (non-blocking; decks load regardless)
+  api
+    .get('/api/auth/me')
+    .then((me) => {
+      if (me?.isAdmin) document.getElementById('admin-link').hidden = false;
+    })
+    .catch(() => {});
+
   const newForm = document.getElementById('new-deck-form');
   document.getElementById('new-deck-btn').addEventListener('click', () => {
     newForm.hidden = !newForm.hidden;
@@ -738,6 +746,70 @@ async function deleteDeck(deckId, el) {
   }
 }
 
+// ── Admin page ────────────────────────────────────────────────────────────────
+
+async function initAdmin() {
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await api.post('/api/auth/logout', {});
+    location.href = '/index.html';
+  });
+
+  const container = document.getElementById('admin-users');
+  let users;
+  try {
+    users = await api.get('/api/admin/users');
+  } catch (err) {
+    container.innerHTML = `<p class="error-msg">${esc(err.message)}</p>`;
+    return;
+  }
+  if (!users) return;
+
+  if (users.length === 0) {
+    container.innerHTML = '<p class="empty">No users in the system.</p>';
+    return;
+  }
+
+  const fmtDate = (d) => new Date(d).toISOString().slice(0, 10);
+
+  container.innerHTML = users
+    .map(
+      (u) => `
+    <div class="deck-card admin-user">
+      <div class="admin-user-header">
+        <div>
+          <h3 class="deck-name">
+            ${esc(u.email)}
+            ${u.isAdmin ? '<span class="badge badge-admin">admin</span>' : ''}
+          </h3>
+          <div class="deck-meta">
+            ${u.name ? esc(u.name) + ' · ' : ''}joined ${fmtDate(u.createdAt)}
+          </div>
+        </div>
+        <div class="deck-stats">
+          <span class="badge badge-total">${u.decks.length} ${u.decks.length === 1 ? 'deck' : 'decks'}</span>
+          <span class="badge badge-total">${u.totalCards} ${u.totalCards === 1 ? 'card' : 'cards'}</span>
+        </div>
+      </div>
+      ${
+        u.decks.length
+          ? `<div class="admin-deck-list">${u.decks
+              .map(
+                (d) => `
+        <div class="admin-deck-row">
+          <span class="card-front-text">${esc(d.name)}</span>
+          <span class="deck-meta">${esc(d.sourceLang)} → ${esc(d.targetLang)}</span>
+          <span class="deck-meta">${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}</span>
+          <span class="deck-meta">created ${fmtDate(d.createdAt)}</span>
+        </div>`,
+              )
+              .join('')}</div>`
+          : '<p class="empty admin-no-decks">No decks.</p>'
+      }
+    </div>`,
+    )
+    .join('');
+}
+
 // ── Study page ────────────────────────────────────────────────────────────────
 
 let queue = [];
@@ -864,6 +936,7 @@ function done(wasEmpty) {
 document.addEventListener('DOMContentLoaded', () => {
   const p = location.pathname;
   if (p.includes('study')) initStudy();
+  else if (p.includes('admin')) initAdmin();
   else if (p.includes('decks')) initDecks();
   else initAuth();
 });

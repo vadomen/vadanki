@@ -30,7 +30,7 @@ Single Express app: `/api/*` routes return JSON; everything else serves `/public
 
 ## Security invariants (must not break)
 
-- Every Mongoose query on `Deck` and `Card` must be scoped by the authenticated `userId`.
+- Every Mongoose query on `Deck` and `Card` must be scoped by the authenticated `userId`. Sole exception: `routes/admin.js`, which is guarded by `requireAdmin` (DB-checked `isAdmin` flag; grant via `node scripts/make-admin.js <email>`).
 - JWT is stored in an httpOnly cookie only — never `localStorage`.
 - Rate-limit `/api/auth/*` (brute-force) and `/api/decks/:id/cards` POST (Gemini quota).
 - All Gemini calls are server-side. Any Gemini failure returns `null`; the route still saves the card so the user can fill in the back manually.
