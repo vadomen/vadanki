@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { rateLimit } from 'express-rate-limit';
 import User from '../models/User.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -59,6 +60,45 @@ router.post('/login', authLimiter, async (req, res) => {
 router.post('/logout', (_req, res) => {
   res.clearCookie('token');
   res.json({ ok: true });
+});
+
+router.get('/me', requireAuth, async (req, res) => {
+  const user = await User.findById(req.userId).select('email name createdAt');
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ userId: user._id, email: user.email, name: user.name, createdAt: user.createdAt });
+});
+
+router.patch('/me', requireAuth, authLimiter, async (req, res) => {
+  const { name, email, currentPassword, newPassword } = req.body ?? {};
+
+  const user = await User.findById(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (newPassword !== undefined && newPassword !== '') {
+    if (newPassword.length < 8)
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    if (!currentPassword || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+  }
+
+  if (typeof name === 'string') user.name = name.trim();
+
+  if (typeof email === 'string' && email.trim()) {
+    user.email = email;
+  } else if (email !== undefined && !String(email ?? '').trim()) {
+    return res.status(400).json({ error: 'Email cannot be empty' });
+  }
+
+  try {
+    await user.save();
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'Email already registered' });
+    throw err;
+  }
+
+  res.json({ userId: user._id, email: user.email, name: user.name });
 });
 
 export default router;

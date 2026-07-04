@@ -61,6 +61,12 @@ body {
   text-decoration: none;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .container {
   max-width: 720px;
   margin: 0 auto;
@@ -170,6 +176,14 @@ body {
   background: #fff5f5;
   border-radius: 6px;
   border: 1px solid #fed7d7;
+}
+.success-msg {
+  color: var(--good);
+  font-size: 0.875rem;
+  padding: 0.45rem 0.75rem;
+  background: #f0fff4;
+  border-radius: 6px;
+  border: 1px solid #c6f6d5;
 }
 .empty {
   color: var(--muted);

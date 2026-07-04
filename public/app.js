@@ -122,6 +122,8 @@ async function initDecks() {
     location.href = '/index.html';
   });
 
+  document.getElementById('profile-btn').addEventListener('click', showProfileModal);
+
   const newForm = document.getElementById('new-deck-form');
   document.getElementById('new-deck-btn').addEventListener('click', () => {
     newForm.hidden = !newForm.hidden;
@@ -215,6 +217,91 @@ async function loadDecks() {
     .forEach((b) =>
       b.addEventListener('click', () => deleteDeck(b.dataset.id, b.closest('.deck-card'))),
     );
+}
+
+async function showProfileModal() {
+  const me = await api.get('/api/auth/me');
+  if (!me) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>My Profile</h3>
+        <button class="btn btn-ghost modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="profile-name">Name:</label>
+          <input type="text" id="profile-name" class="input" value="${esc(me.name)}" placeholder="Your name" maxlength="100" />
+        </div>
+        <div class="form-group">
+          <label for="profile-email">Email:</label>
+          <input type="email" id="profile-email" class="input" value="${esc(me.email)}" required />
+        </div>
+        <div class="form-group">
+          <label for="profile-current-password">Current password (only to change password):</label>
+          <input type="password" id="profile-current-password" class="input" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label for="profile-new-password">New password:</label>
+          <input type="password" id="profile-new-password" class="input" autocomplete="new-password" minlength="8" />
+        </div>
+        <p class="error-msg profile-error" hidden></p>
+        <p class="success-msg profile-success" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button class="btn btn-primary modal-save">Save Changes</button>
+      </div>
+    </div>
+  `;
+
+  const close = setupModal(modal);
+
+  modal.querySelector('.modal-save').addEventListener('click', async () => {
+    const errEl = modal.querySelector('.profile-error');
+    const okEl = modal.querySelector('.profile-success');
+    errEl.hidden = true;
+    okEl.hidden = true;
+
+    const email = modal.querySelector('#profile-email').value.trim();
+    if (!email) {
+      errEl.textContent = 'Email is required';
+      errEl.hidden = false;
+      return;
+    }
+
+    const newPassword = modal.querySelector('#profile-new-password').value;
+    const currentPassword = modal.querySelector('#profile-current-password').value;
+    if (newPassword && !currentPassword) {
+      errEl.textContent = 'Enter your current password to set a new one';
+      errEl.hidden = false;
+      return;
+    }
+
+    const payload = { name: modal.querySelector('#profile-name').value.trim(), email };
+    if (newPassword) {
+      payload.currentPassword = currentPassword;
+      payload.newPassword = newPassword;
+    }
+
+    const btn = modal.querySelector('.modal-save');
+    btn.disabled = true;
+    try {
+      await api.patch('/api/auth/me', payload);
+      okEl.textContent = '✅ Profile updated';
+      okEl.hidden = false;
+      modal.querySelector('#profile-current-password').value = '';
+      modal.querySelector('#profile-new-password').value = '';
+      setTimeout(close, 1200);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+      btn.disabled = false;
+    }
+  });
 }
 
 function showEditDeckModal(deck) {
