@@ -437,9 +437,11 @@ async function loadCards(deckId) {
         const resultsBox = e.target.querySelector('.card-search-results');
         resultsBox.hidden = true;
         resultsBox.innerHTML = '';
-        status.textContent = created.aiFailed
-          ? '⚠️ Card added without translation — AI is unavailable right now. Use ✏️ to fill it in.'
-          : '✅ Card added!';
+        status.textContent = created.aiLimited
+          ? '⚠️ Card added without translation — daily AI limit reached. Use ✏️ to fill it in.'
+          : created.aiFailed
+            ? '⚠️ Card added without translation — AI is unavailable right now. Use ✏️ to fill it in.'
+            : '✅ Card added!';
         const updated = await api.get('/api/decks/' + deckId + '/cards');
         if (updated) {
           document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);

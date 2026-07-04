@@ -4,6 +4,7 @@ import Deck from '../models/Deck.js';
 import Card from '../models/Card.js';
 import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
+import { tryConsumeAiQuota } from '../services/aiQuota.js';
 import { serializeCSV, parseCSV } from '../services/csv.js';
 
 const router = express.Router();
@@ -74,12 +75,18 @@ router.get('/:id/cards', async (req, res) => {
   res.json(cards);
 });
 
+// Keyed per user (requireAuth runs first), so bots rotating IPs on one stolen
+// account stay limited, and users behind a shared NAT don't block each other.
 const cardCreateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => String(req.userId),
 });
+
+// Longest front we'll send to Gemini — real words/phrases fit; junk doesn't.
+const AI_MAX_FRONT_LENGTH = 200;
 
 // POST /api/decks/:id/cards — create card; calls Gemini for translation + example
 router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
@@ -92,14 +99,20 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
   // Call Gemini only when back is not manually provided
   let resolvedBack = back ?? '';
   let aiFailed = false;
-  if (!resolvedBack && process.env.GEMINI_API_KEY) {
-    const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
-    if (ai?.translation) {
-      const t = ai.translation.trim();
-      const ex = (ai.exampleSentence ?? '').trim();
-      resolvedBack = ex ? `<b>${t}</b><br><i>${ex}</i>` : `<b>${t}</b>`;
+  let aiLimited = false;
+  if (!resolvedBack && process.env.GEMINI_API_KEY && front.length <= AI_MAX_FRONT_LENGTH) {
+    if (await tryConsumeAiQuota(req.userId)) {
+      const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
+      if (ai?.translation) {
+        const t = ai.translation.trim();
+        const ex = (ai.exampleSentence ?? '').trim();
+        resolvedBack = ex ? `<b>${t}</b><br><i>${ex}</i>` : `<b>${t}</b>`;
+      } else {
+        aiFailed = true;
+      }
     } else {
       aiFailed = true;
+      aiLimited = true;
     }
   }
 
@@ -110,7 +123,7 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     back: resolvedBack,
     exampleSentence: exampleSentence ?? '',
   });
-  res.status(201).json({ ...card.toJSON(), aiFailed });
+  res.status(201).json({ ...card.toJSON(), aiFailed, aiLimited });
 });
 
 // GET /api/decks/:id/export.csv — download all cards as CSV

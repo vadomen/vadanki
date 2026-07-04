@@ -7,6 +7,8 @@ export async function setup() {
   mongod = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongod.getUri();
   process.env.JWT_SECRET = 'test-secret';
+  // .env is loaded by server.js — drop the real key so tests never call Gemini
+  delete process.env.GEMINI_API_KEY;
   await mongoose.connect(process.env.MONGODB_URI);
 }
 

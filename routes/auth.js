@@ -14,6 +14,16 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Registration gets a much tighter cap: mass-created accounts are the main
+// path to draining the Gemini quota. Skipped under test (supertest shares one IP).
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
 function cookieOpts(req) {
   return {
     httpOnly: true,
@@ -27,7 +37,7 @@ function signToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', authLimiter, registerLimiter, async (req, res) => {
   const { email, password } = req.body ?? {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   if (password.length < 8)
