@@ -142,6 +142,7 @@ async function loadDecks() {
           <a href="/study.html?deck=${d._id}&name=${encodeURIComponent(d.name)}"
              class="btn btn-primary">Study</a>
           <button class="btn btn-ghost" data-action="cards" data-id="${d._id}">Cards</button>
+          <button class="btn btn-ghost" data-action="edit" data-id="${d._id}">Edit</button>
           <button class="btn btn-ghost btn-danger-hover" data-action="delete" data-id="${d._id}">Delete</button>
         </div>
       </div>
@@ -154,10 +155,93 @@ async function loadDecks() {
     .querySelectorAll('[data-action="cards"]')
     .forEach((b) => b.addEventListener('click', () => togglePanel(b.dataset.id)));
   list
+    .querySelectorAll('[data-action="edit"]')
+    .forEach((b) =>
+      b.addEventListener('click', () =>
+        showEditDeckModal(decks.find((d) => d._id === b.dataset.id)),
+      ),
+    );
+  list
     .querySelectorAll('[data-action="delete"]')
     .forEach((b) =>
       b.addEventListener('click', () => deleteDeck(b.dataset.id, b.closest('.deck-card'))),
     );
+}
+
+function showEditDeckModal(deck) {
+  if (!deck) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Deck</h3>
+        <button class="btn btn-ghost modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="edit-deck-name">Name:</label>
+          <input type="text" id="edit-deck-name" class="input" value="${esc(deck.name)}" required />
+        </div>
+        <div class="form-group">
+          <label for="edit-deck-source">From:</label>
+          <input type="text" id="edit-deck-source" class="input" value="${esc(deck.sourceLang)}" />
+        </div>
+        <div class="form-group">
+          <label for="edit-deck-target">To:</label>
+          <input type="text" id="edit-deck-target" class="input" value="${esc(deck.targetLang)}" />
+        </div>
+        <div class="form-group">
+          <label for="edit-deck-newperday">New cards per day:</label>
+          <input type="number" id="edit-deck-newperday" class="input" value="${esc(deck.newPerDay)}" min="1" max="200" />
+        </div>
+        <p class="error-msg edit-deck-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost modal-cancel">Cancel</button>
+        <button class="btn btn-primary modal-save">Save Changes</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  const close = () => document.body.removeChild(modal);
+
+  modal.querySelector('.modal-close').addEventListener('click', close);
+  modal.querySelector('.modal-cancel').addEventListener('click', close);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
+
+  modal.querySelector('.modal-save').addEventListener('click', async () => {
+    const errEl = modal.querySelector('.edit-deck-error');
+    errEl.hidden = true;
+
+    const name = modal.querySelector('#edit-deck-name').value.trim();
+    if (!name) {
+      errEl.textContent = 'Name is required';
+      errEl.hidden = false;
+      return;
+    }
+
+    const btn = modal.querySelector('.modal-save');
+    btn.disabled = true;
+    try {
+      await api.patch('/api/decks/' + deck._id, {
+        name,
+        sourceLang: modal.querySelector('#edit-deck-source').value.trim() || 'en',
+        targetLang: modal.querySelector('#edit-deck-target').value.trim() || 'es',
+        newPerDay: Number(modal.querySelector('#edit-deck-newperday').value) || 20,
+      });
+      close();
+      await loadDecks();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+      btn.disabled = false;
+    }
+  });
 }
 
 async function togglePanel(deckId) {
