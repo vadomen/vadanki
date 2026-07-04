@@ -91,12 +91,15 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
 
   // Call Gemini only when back is not manually provided
   let resolvedBack = back ?? '';
+  let aiFailed = false;
   if (!resolvedBack && process.env.GEMINI_API_KEY) {
     const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
     if (ai?.translation) {
       const t = ai.translation.trim();
       const ex = (ai.exampleSentence ?? '').trim();
       resolvedBack = ex ? `<b>${t}</b><br><i>${ex}</i>` : `<b>${t}</b>`;
+    } else {
+      aiFailed = true;
     }
   }
 
@@ -107,7 +110,7 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     back: resolvedBack,
     exampleSentence: exampleSentence ?? '',
   });
-  res.status(201).json(card);
+  res.status(201).json({ ...card.toJSON(), aiFailed });
 });
 
 // GET /api/decks/:id/export.csv — download all cards as CSV

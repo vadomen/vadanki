@@ -334,7 +334,7 @@ async function loadCards(deckId) {
       btn.disabled = true;
       status.textContent = fd.get('back').trim() ? 'Adding…' : '⏳ Generating translation with AI…';
       try {
-        await api.post('/api/decks/' + deckId + '/cards', {
+        const created = await api.post('/api/decks/' + deckId + '/cards', {
           front: fd.get('front'),
           back: fd.get('back'),
         });
@@ -342,16 +342,21 @@ async function loadCards(deckId) {
         const resultsBox = e.target.querySelector('.card-search-results');
         resultsBox.hidden = true;
         resultsBox.innerHTML = '';
-        status.textContent = '✅ Card added!';
+        status.textContent = created.aiFailed
+          ? '⚠️ Card added without translation — AI is unavailable right now. Use ✏️ to fill it in.'
+          : '✅ Card added!';
         const updated = await api.get('/api/decks/' + deckId + '/cards');
         if (updated) {
           document.getElementById('clist-' + deckId).innerHTML = renderCardRows(updated);
           attachDeleters(deckId);
           refreshDeckBadge(deckId, updated.length);
         }
-        setTimeout(() => {
-          status.textContent = '';
-        }, 2500);
+        setTimeout(
+          () => {
+            status.textContent = '';
+          },
+          created.aiFailed ? 8000 : 2500,
+        );
       } catch (err) {
         status.textContent = '❌ ' + err.message;
       } finally {
