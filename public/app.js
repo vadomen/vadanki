@@ -637,7 +637,7 @@ async function showEditCardModal(cardId, deckId) {
 }
 
 // Preview a card exactly as it appears during study: a flippable 3D card.
-async function showPreviewCardModal(cardId) {
+async function showPreviewCardModal(cardId, deckId) {
   const card = await api.get('/api/cards/' + cardId);
   if (!card) {
     alert('Card not found');
@@ -670,6 +670,10 @@ async function showPreviewCardModal(cardId) {
           </div>
         </div>
       </div>
+      <div class="modal-footer modal-footer-split">
+        <p class="regen-status"></p>
+        <button class="btn btn-ghost regen-btn">🔄 Regenerate translation</button>
+      </div>
     </div>
   `;
 
@@ -677,6 +681,32 @@ async function showPreviewCardModal(cardId) {
 
   const previewCard = modal.querySelector('.preview-card');
   previewCard.addEventListener('click', () => previewCard.classList.toggle('flipped'));
+
+  const regenBtn = modal.querySelector('.regen-btn');
+  const status = modal.querySelector('.regen-status');
+  regenBtn.addEventListener('click', async () => {
+    regenBtn.disabled = true;
+    status.textContent = '⏳ Regenerating…';
+    try {
+      const updated = await api.post('/api/cards/' + cardId + '/regenerate', {});
+      modal.querySelector('.card-translation').innerHTML = updated.back;
+      previewCard.classList.add('flipped');
+      status.textContent = '✅ Translation updated';
+      // Refresh the open deck panel so the list shows the new back
+      const list = deckId && document.getElementById('clist-' + deckId);
+      if (list) {
+        const cards = await api.get('/api/decks/' + deckId + '/cards');
+        if (cards) {
+          list.innerHTML = renderCardRows(cards);
+          attachDeleters(deckId);
+        }
+      }
+    } catch (err) {
+      status.textContent = '❌ ' + err.message;
+    } finally {
+      regenBtn.disabled = false;
+    }
+  });
 }
 
 function stripHtml(html) {
@@ -743,7 +773,7 @@ function attachDeleters(deckId) {
     .querySelectorAll('.preview-card-btn')
     .forEach((btn) =>
       btn.addEventListener('click', async () => {
-        await showPreviewCardModal(btn.dataset.id);
+        await showPreviewCardModal(btn.dataset.id, deckId);
       }),
     );
 

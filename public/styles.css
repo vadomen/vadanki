@@ -854,3 +854,14 @@ body {
   display: flex;
   justify-content: center;
 }
+
+/* Preview modal footer: status text left, regenerate button right */
+.modal-footer-split {
+  justify-content: space-between;
+  align-items: center;
+}
+.regen-status {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}

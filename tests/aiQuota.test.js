@@ -1,13 +1,18 @@
+// All tests that mock the Gemini service live in this one file: with
+// unstable_mockModule + --runInBand, two files mocking the same module can end
+// up asserting on a different mock instance than the one the server captured.
 import { jest } from '@jest/globals';
 import request from 'supertest';
 import { setup, teardown, clearDB } from './setup.js';
 
-jest.unstable_mockModule('../services/geminiService.js', () => ({
-  translateWord: jest.fn(async () => ({ translation: 'hola', exampleSentence: '¡Hola!' })),
-}));
+// The jest.fn must live outside the factory: jest may run the factory once per
+// importing module (decks.js, cards.js, this file), and a fn created inside
+// would give each importer its own instance — calls would land on one while
+// assertions watch another.
+const translateWord = jest.fn(async () => ({ translation: 'hola', exampleSentence: '¡Hola!' }));
+jest.unstable_mockModule('../services/geminiService.js', () => ({ translateWord }));
 
 const { default: app } = await import('../server.js');
-const { translateWord } = await import('../services/geminiService.js');
 
 beforeAll(async () => {
   await setup();
@@ -93,5 +98,78 @@ describe('AI daily quota', () => {
     expect(res.status).toBe(201);
     expect(res.body.back).toBe('');
     expect(translateWord).not.toHaveBeenCalled();
+  });
+});
+
+async function createCardWithBack(ctx, front = 'hello', back = 'old translation') {
+  const card = await request(app)
+    .post(`/api/decks/${ctx.deckId}/cards`)
+    .set('Cookie', ctx.cookie)
+    .send({ front, back });
+  return card.body._id;
+}
+
+const regenerate = (ctx, cardId) =>
+  request(app).post(`/api/cards/${cardId}/regenerate`).set('Cookie', ctx.cookie).send({});
+
+describe('POST /api/cards/:id/regenerate', () => {
+  it('replaces the back with a fresh AI translation', async () => {
+    const ctx = await createUserAndDeck();
+    const cardId = await createCardWithBack(ctx);
+    const res = await regenerate(ctx, cardId);
+    expect(res.status).toBe(200);
+    expect(res.body.back).toBe('<b>hola</b><br><i>¡Hola!</i>');
+    expect(translateWord).toHaveBeenCalledWith('hello', 'en', 'es');
+  });
+
+  it("404s for another user's card", async () => {
+    const ctx = await createUserAndDeck();
+    const cardId = await createCardWithBack(ctx);
+    const other = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'other@example.com', password: 'password123' });
+    const res = await request(app)
+      .post(`/api/cards/${cardId}/regenerate`)
+      .set('Cookie', other.headers['set-cookie'])
+      .send({});
+    expect(res.status).toBe(404);
+    expect(translateWord).not.toHaveBeenCalled();
+  });
+
+  it('keeps the old back and returns 502 when AI fails', async () => {
+    const ctx = await createUserAndDeck();
+    const cardId = await createCardWithBack(ctx);
+    translateWord.mockResolvedValueOnce(null);
+    const res = await regenerate(ctx, cardId);
+    expect(res.status).toBe(502);
+
+    const card = await request(app).get(`/api/cards/${cardId}`).set('Cookie', ctx.cookie);
+    expect(card.body.back).toBe('old translation');
+  });
+
+  it('returns 429 when the daily AI budget is exhausted', async () => {
+    process.env.AI_DAILY_LIMIT_USER = '1';
+    try {
+      const ctx = await createUserAndDeck();
+      const cardId = await createCardWithBack(ctx);
+      await regenerate(ctx, cardId);
+      const res = await regenerate(ctx, cardId);
+      expect(res.status).toBe(429);
+      expect(translateWord).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env.AI_DAILY_LIMIT_USER = '2';
+    }
+  });
+
+  it('returns 503 when Gemini is not configured', async () => {
+    const ctx = await createUserAndDeck();
+    const cardId = await createCardWithBack(ctx);
+    delete process.env.GEMINI_API_KEY;
+    try {
+      const res = await regenerate(ctx, cardId);
+      expect(res.status).toBe(503);
+    } finally {
+      process.env.GEMINI_API_KEY = 'test-key';
+    }
   });
 });

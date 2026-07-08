@@ -1,5 +1,8 @@
 import AiUsage from '../models/AiUsage.js';
 
+// Longest front we'll send to Gemini — real words/phrases fit; junk doesn't.
+export const AI_MAX_FRONT_LENGTH = 200;
+
 const userLimit = () => Number(process.env.AI_DAILY_LIMIT_USER ?? 50);
 const globalLimit = () => Number(process.env.AI_DAILY_LIMIT_GLOBAL ?? 500);
 

@@ -4,7 +4,7 @@ import Deck from '../models/Deck.js';
 import Card from '../models/Card.js';
 import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
-import { tryConsumeAiQuota } from '../services/aiQuota.js';
+import { tryConsumeAiQuota, AI_MAX_FRONT_LENGTH } from '../services/aiQuota.js';
 import { serializeCSV, parseCSV } from '../services/csv.js';
 
 const router = express.Router();
@@ -84,9 +84,6 @@ const cardCreateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => String(req.userId),
 });
-
-// Longest front we'll send to Gemini — real words/phrases fit; junk doesn't.
-const AI_MAX_FRONT_LENGTH = 200;
 
 // POST /api/decks/:id/cards — create card; calls Gemini for translation + example
 router.post('/:id/cards', cardCreateLimiter, async (req, res) => {

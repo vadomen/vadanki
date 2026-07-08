@@ -32,7 +32,7 @@ Single Express app: `/api/*` routes return JSON; everything else serves `/public
 
 - Every Mongoose query on `Deck` and `Card` must be scoped by the authenticated `userId`. Sole exception: `routes/admin.js`, which is guarded by `requireAdmin` (DB-checked `isAdmin` flag; grant via `node scripts/make-admin.js <email>`).
 - JWT is stored in an httpOnly cookie only — never `localStorage`.
-- Rate-limit `/api/auth/*` (brute-force) and `/api/decks/:id/cards` POST (Gemini quota). Registration has a stricter cap (5/hour/IP).
+- Rate-limit `/api/auth/*` (brute-force) and the Gemini-spending endpoints (`/api/decks/:id/cards` POST, `/api/cards/:id/regenerate` POST). Registration has a stricter cap (5/hour/IP).
 - Registration is protected by Cloudflare Turnstile when `TURNSTILE_SECRET_KEY`/`TURNSTILE_SITE_KEY` are set (verification fails closed). Unset (dev/tests) → registration is open.
 - Gemini calls are budgeted per day (`services/aiQuota.js`): `AI_DAILY_LIMIT_USER` per user and `AI_DAILY_LIMIT_GLOBAL` overall (defaults 50/500). Over budget → card still saves, `aiLimited: true` in the response.
 - Tests must never call the real Gemini API — `tests/setup.js` deletes `GEMINI_API_KEY`.
