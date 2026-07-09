@@ -927,6 +927,9 @@ function showCard() {
   const rem = queue.length - qIdx;
   document.getElementById('progress').textContent =
     rem + ' card' + (rem !== 1 ? 's' : '') + ' remaining';
+  // queue.length can grow ("again" requeues the card), so recompute each time
+  document.getElementById('progress-fill').style.width =
+    Math.round((qIdx / queue.length) * 100) + '%';
 
   document.getElementById('card-front-text').textContent = card.front;
   // back may contain HTML (e.g. imported as <b>translation</b><br><i>example</i>)
