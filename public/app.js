@@ -221,6 +221,17 @@ async function loadDecks() {
             ${d.due > 0 ? `<span class="badge badge-due">${d.due} due</span>` : ''}
             <span class="badge badge-total">${d.total} ${d.total === 1 ? 'card' : 'cards'}</span>
           </div>
+          ${
+            d.total > 0
+              ? `
+          <div class="deck-progress" title="Cards whose last review was graded Good or Easy">
+            <div class="progress-bar deck-progress-bar">
+              <div class="progress-fill" style="width:${Math.round((d.learned / d.total) * 100)}%"></div>
+            </div>
+            <span class="deck-progress-label">${d.learned}/${d.total} learned</span>
+          </div>`
+              : ''
+          }
         </div>
         <div class="deck-actions">
           <a href="/study.html?deck=${d._id}&name=${encodeURIComponent(d.name)}"

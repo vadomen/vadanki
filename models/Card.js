@@ -17,6 +17,7 @@ const cardSchema = new mongoose.Schema(
     repetitions: { type: Number, default: 0 },
     dueDate: { type: Date, default: Date.now },
     lastReviewedAt: { type: Date, default: null },
+    lastGrade: { type: String, enum: ['again', 'hard', 'good', 'easy'], default: null },
   },
   { timestamps: true },
 );

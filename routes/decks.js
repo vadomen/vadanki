@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 
   const counts = await Promise.all(
     decks.map(async (deck) => {
-      const [total, due, newToday] = await Promise.all([
+      const [total, due, newToday, learned] = await Promise.all([
         Card.countDocuments({ deckId: deck._id, userId: req.userId }),
         Card.countDocuments({
           deckId: deck._id,
@@ -31,8 +31,20 @@ router.get('/', async (req, res) => {
           userId: req.userId,
           createdAt: { $gte: todayStart },
         }),
+        // "Learned" = last grade good/easy. Cards reviewed before lastGrade
+        // existed (null but repetitions > 0) count too — SM-2 resets
+        // repetitions on "again", so they passed their last review; the
+        // approximation self-corrects as cards get reviewed again.
+        Card.countDocuments({
+          deckId: deck._id,
+          userId: req.userId,
+          $or: [
+            { lastGrade: { $in: ['good', 'easy'] } },
+            { lastGrade: null, repetitions: { $gt: 0 } },
+          ],
+        }),
       ]);
-      return { ...deck, total, due, newToday };
+      return { ...deck, total, due, newToday, learned };
     }),
   );
 

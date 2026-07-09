@@ -73,6 +73,47 @@ describe('Decks CRUD', () => {
     await request(app).get('/api/decks').expect(401);
   });
 
+  it('counts cards last graded good or easy as learned', async () => {
+    const deck = await request(app)
+      .post('/api/decks')
+      .set('Cookie', cookie)
+      .send({ name: 'Progress' });
+    const deckId = deck.body._id;
+
+    const cardIds = [];
+    for (const front of ['uno', 'dos', 'tres']) {
+      const card = await request(app)
+        .post(`/api/decks/${deckId}/cards`)
+        .set('Cookie', cookie)
+        .send({ front, back: 'x' });
+      cardIds.push(card.body._id);
+    }
+
+    // good + easy → learned; again → not learned; grades overwrite each other
+    await request(app)
+      .post(`/api/study/${cardIds[0]}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'good' });
+    await request(app)
+      .post(`/api/study/${cardIds[1]}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'easy' });
+    await request(app)
+      .post(`/api/study/${cardIds[2]}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'good' });
+    const regraded = await request(app)
+      .post(`/api/study/${cardIds[2]}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'again' });
+    expect(regraded.body.lastGrade).toBe('again');
+
+    const res = await request(app).get('/api/decks').set('Cookie', cookie).expect(200);
+    const progress = res.body.find((d) => d._id === deckId);
+    expect(progress.total).toBe(3);
+    expect(progress.learned).toBe(2);
+  });
+
   it("cannot access another user's deck", async () => {
     const deck = await request(app).post('/api/decks').set('Cookie', cookie).send({ name: 'Mine' });
     const id = deck.body._id;

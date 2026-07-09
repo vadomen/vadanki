@@ -880,3 +880,26 @@ body {
   color: var(--muted);
   margin: 0;
 }
+
+/* Per-deck learned progress */
+.deck-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.deck-progress-bar {
+  flex: 1;
+  max-width: 220px;
+  height: 5px;
+  margin-bottom: 0;
+}
+.deck-progress .progress-fill {
+  background: var(--good);
+}
+.deck-progress-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

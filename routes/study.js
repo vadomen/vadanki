@@ -63,6 +63,7 @@ router.post('/:cardId/review', async (req, res) => {
 
   const updates = applyGrade(card, grade);
   Object.assign(card, updates);
+  card.lastGrade = grade;
   await card.save();
 
   res.json(card);
