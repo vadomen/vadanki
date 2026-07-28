@@ -109,8 +109,10 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
   let resolvedBack = back ?? '';
   let aiFailed = false;
   let aiLimited = false;
-  if (!resolvedBack && process.env.GEMINI_API_KEY && front.length <= AI_MAX_FRONT_LENGTH) {
-    if (await tryConsumeAiQuota(req.userId)) {
+  if (!resolvedBack) {
+    if (!process.env.GEMINI_API_KEY || front.length > AI_MAX_FRONT_LENGTH) {
+      aiFailed = true;
+    } else if (await tryConsumeAiQuota(req.userId)) {
       const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
       if (ai?.translation) {
         const t = ai.translation.trim();

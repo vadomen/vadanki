@@ -36,10 +36,16 @@ export async function translateWord(word, sourceCode, targetCode) {
       try {
         const result = await getClient().models.generateContent({ model, contents: prompt });
         const raw = result.text ?? '';
-        const cleaned = raw
+        let cleaned = raw
           .replace(/^```(?:json)?\s*/i, '')
           .replace(/\s*```$/i, '')
           .trim();
+        // If the model wrapped JSON in prose, extract the object portion.
+        if (!cleaned.startsWith('{')) {
+          const start = cleaned.indexOf('{');
+          const end = cleaned.lastIndexOf('}');
+          if (start !== -1 && end > start) cleaned = cleaned.slice(start, end + 1);
+        }
         return JSON.parse(cleaned);
       } catch (err) {
         const status = err.status ?? err.name ?? 'error';
