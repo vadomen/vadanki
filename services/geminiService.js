@@ -49,7 +49,8 @@ export async function translateWord(word, sourceCode, targetCode) {
         return JSON.parse(cleaned);
       } catch (err) {
         const status = err.status ?? err.name ?? 'error';
-        console.error(`Gemini ${model} failed: ${status}`);
+        const detail = err.message ?? err.error?.message ?? '';
+        console.error(`Gemini ${model} failed: ${status} ${detail}`);
         if (typeof err.status !== 'number' || err.status < 500) break; // quota/parse — next model
         await new Promise((r) => setTimeout(r, 1500));
       }
