@@ -35,7 +35,12 @@ const PORT = process.env.PORT ?? 3000;
 
 if (process.env.NODE_ENV !== 'test') {
   await connectDB();
-  app.listen(PORT, () => console.log(`Listening on :${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`Listening on :${PORT}`);
+    console.log(
+      `AI translation: ${process.env.GEMINI_API_KEY ? 'enabled' : 'DISABLED — set GEMINI_API_KEY to enable'}`,
+    );
+  });
 }
 
 export default app;
