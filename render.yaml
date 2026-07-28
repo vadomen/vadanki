@@ -2,7 +2,7 @@ services:
   - type: web
     name: vadanki
     env: node
-    region: frankfurt
+    region: oregon
     plan: free
     buildCommand: npm install
     startCommand: npm start
