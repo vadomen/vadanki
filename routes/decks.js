@@ -20,11 +20,13 @@ router.get('/', async (req, res) => {
     decks.map(async (deck) => {
       const [total, due, newToday, learned] = await Promise.all([
         Card.countDocuments({ deckId: deck._id, userId: req.userId }),
+        // Must match the due query in routes/study.js — lastReviewedAt, not
+        // repetitions, which SM-2 resets to 0 on "again".
         Card.countDocuments({
           deckId: deck._id,
           userId: req.userId,
           dueDate: { $lte: now },
-          repetitions: { $gt: 0 },
+          lastReviewedAt: { $ne: null },
         }),
         Card.countDocuments({
           deckId: deck._id,

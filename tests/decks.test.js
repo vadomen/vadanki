@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../server.js';
+import Card from '../models/Card.js';
 import { setup, teardown, clearDB } from './setup.js';
 
 beforeAll(setup);
@@ -112,6 +113,31 @@ describe('Decks CRUD', () => {
     const progress = res.body.find((d) => d._id === deckId);
     expect(progress.total).toBe(3);
     expect(progress.learned).toBe(2);
+  });
+
+  // Regression: the due count must stay in step with the study queue — a
+  // lapsed ("again") card has repetitions 0 but is still a real review.
+  it('counts an overdue lapsed card as due', async () => {
+    const deck = await request(app).post('/api/decks').set('Cookie', cookie).send({ name: 'Due' });
+    const deckId = deck.body._id;
+
+    const card = await request(app)
+      .post(`/api/decks/${deckId}/cards`)
+      .set('Cookie', cookie)
+      .send({ front: 'lapsed', back: 'x' });
+
+    await request(app)
+      .post(`/api/study/${card.body._id}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'again' });
+
+    await Card.updateOne(
+      { _id: card.body._id },
+      { $set: { dueDate: new Date(Date.now() - 86400000) } },
+    );
+
+    const res = await request(app).get('/api/decks').set('Cookie', cookie).expect(200);
+    expect(res.body.find((d) => d._id === deckId).due).toBe(1);
   });
 
   it("cannot access another user's deck", async () => {

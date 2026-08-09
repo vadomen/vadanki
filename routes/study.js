@@ -15,12 +15,15 @@ router.get('/:deckId', async (req, res) => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Due cards (already reviewed at least once, overdue)
+  // Due cards (already reviewed at least once, overdue). Keyed off
+  // lastReviewedAt, not repetitions: SM-2 resets repetitions to 0 on "again",
+  // so a lapsed card would otherwise match neither this query nor the new-card
+  // query below and drop out of study forever.
   const due = await Card.find({
     deckId: deck._id,
     userId: req.userId,
     dueDate: { $lte: now },
-    repetitions: { $gt: 0 },
+    lastReviewedAt: { $ne: null },
   }).sort({ dueDate: 1 });
 
   // New cards introduced today so far

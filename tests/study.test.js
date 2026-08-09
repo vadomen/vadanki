@@ -1,6 +1,11 @@
 import request from 'supertest';
 import app from '../server.js';
+import Card from '../models/Card.js';
 import { setup, teardown, clearDB } from './setup.js';
+
+// Push a card's dueDate into the past so it reads as overdue.
+const makeOverdue = (cardId) =>
+  Card.updateOne({ _id: cardId }, { $set: { dueDate: new Date(Date.now() - 86400000) } });
 
 beforeAll(setup);
 afterAll(teardown);
@@ -37,6 +42,39 @@ describe('GET /api/study/:deckId', () => {
   it('returns 404 for unknown deck', async () => {
     const { cookie } = await bootstrap();
     await request(app).get('/api/study/000000000000000000000000').set('Cookie', cookie).expect(404);
+  });
+
+  // Regression: SM-2 resets repetitions to 0 on "again". When the due query
+  // filtered on repetitions > 0, a lapsed card matched neither due nor new
+  // and disappeared from study permanently.
+  it('returns a lapsed ("again") card once it is overdue', async () => {
+    const { cookie, deckId, cardId } = await bootstrap();
+
+    await request(app)
+      .post(`/api/study/${cardId}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'again' })
+      .expect(200);
+
+    await makeOverdue(cardId);
+
+    const res = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie).expect(200);
+    expect(res.body.due.map((c) => c._id)).toEqual([cardId]);
+    // and it must not be double-served as a new card
+    expect(res.body.new).toHaveLength(0);
+  });
+
+  it('does not return a lapsed card before it is due again', async () => {
+    const { cookie, deckId, cardId } = await bootstrap();
+
+    await request(app)
+      .post(`/api/study/${cardId}/review`)
+      .set('Cookie', cookie)
+      .send({ grade: 'again' });
+
+    const res = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie).expect(200);
+    expect(res.body.due).toHaveLength(0);
+    expect(res.body.new).toHaveLength(0);
   });
 });
 
