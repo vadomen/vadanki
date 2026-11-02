@@ -5,6 +5,7 @@ import Deck from '../models/Deck.js';
 import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
 import { tryConsumeAiQuota, AI_MAX_FRONT_LENGTH } from '../services/aiQuota.js';
+import { logEvent } from '../services/eventLog.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -57,11 +58,18 @@ router.post('/:id/regenerate', regenerateLimiter, async (req, res) => {
     return res.status(503).json({ error: 'AI translation is not configured' });
   if (card.front.length > AI_MAX_FRONT_LENGTH)
     return res.status(400).json({ error: 'Front text is too long for AI translation' });
-  if (!(await tryConsumeAiQuota(req.userId)))
+  if (!(await tryConsumeAiQuota(req.userId))) {
+    logEvent('ai.limited', { userId: req.userId, cardId: card._id, source: 'regenerate' });
     return res.status(429).json({ error: 'Daily AI limit reached — try again tomorrow' });
+  }
 
   const deck = await Deck.findOne({ _id: card.deckId, userId: req.userId });
-  const ai = await translateWord(card.front, deck?.sourceLang ?? 'en', deck?.targetLang ?? 'es');
+  const ai = await translateWord(card.front, deck?.sourceLang ?? 'en', deck?.targetLang ?? 'es', {
+    userId: req.userId,
+    deckId: card.deckId,
+    cardId: card._id,
+    source: 'regenerate',
+  });
   if (!ai?.translation)
     return res.status(502).json({ error: 'AI is unavailable right now — try again later' });
 

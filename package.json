@@ -12,7 +12,8 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "events": "node scripts/events.js"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

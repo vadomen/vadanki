@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { log, logEvent } from './eventLog.js';
 
 let ai;
 function getClient() {
@@ -20,7 +21,24 @@ const langName = (code) => {
   }
 };
 
-export async function translateWord(word, sourceCode, targetCode) {
+// ctx: { userId, deckId, cardId, source } — recorded in the ai.call event
+// (ids and outcome only; the word itself is never logged).
+export async function translateWord(word, sourceCode, targetCode, ctx = {}) {
+  const started = Date.now();
+  const errors = [];
+  let attempts = 0;
+  const done = (model, result) => {
+    logEvent('ai.call', {
+      ...ctx,
+      ok: Boolean(result),
+      model,
+      attempts,
+      ms: Date.now() - started,
+      errors,
+    });
+    return result;
+  };
+
   const sourceLang = langName(sourceCode);
   const targetLang = langName(targetCode);
   const prompt =
@@ -33,6 +51,7 @@ export async function translateWord(word, sourceCode, targetCode) {
   for (const model of MODELS) {
     // One extra attempt per model for transient 5xx ("model overloaded") errors.
     for (let attempt = 0; attempt < 2; attempt++) {
+      attempts++;
       try {
         const result = await getClient().models.generateContent({ model, contents: prompt });
         const raw = result.text ?? '';
@@ -46,15 +65,16 @@ export async function translateWord(word, sourceCode, targetCode) {
           const end = cleaned.lastIndexOf('}');
           if (start !== -1 && end > start) cleaned = cleaned.slice(start, end + 1);
         }
-        return JSON.parse(cleaned);
+        return done(model, JSON.parse(cleaned));
       } catch (err) {
         const status = err.status ?? err.name ?? 'error';
         const detail = err.message ?? err.error?.message ?? '';
-        console.error(`Gemini ${model} failed: ${status} ${detail}`);
+        errors.push(`${model}: ${status}`);
+        log('warn', 'gemini call failed', { model, status, detail: String(detail).slice(0, 300) });
         if (typeof err.status !== 'number' || err.status < 500) break; // quota/parse — next model
         await new Promise((r) => setTimeout(r, 1500));
       }
     }
   }
-  return null;
+  return done(null, null);
 }

@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
 import { tryConsumeAiQuota, AI_MAX_FRONT_LENGTH } from '../services/aiQuota.js';
 import { serializeCSV, parseCSV } from '../services/csv.js';
+import { logEvent } from '../services/eventLog.js';
 import { startOfDay } from '../services/day.js';
 import { LEARNED_GRADES, countIntroducedToday, gradeBreakdown } from '../services/deckStats.js';
 
@@ -113,7 +114,11 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     if (!process.env.GEMINI_API_KEY || front.length > AI_MAX_FRONT_LENGTH) {
       aiFailed = true;
     } else if (await tryConsumeAiQuota(req.userId)) {
-      const ai = await translateWord(front, deck.sourceLang, deck.targetLang);
+      const ai = await translateWord(front, deck.sourceLang, deck.targetLang, {
+        userId: req.userId,
+        deckId: deck._id,
+        source: 'create',
+      });
       if (ai?.translation) {
         const t = ai.translation.trim();
         const ex = (ai.exampleSentence ?? '').trim();
@@ -124,6 +129,7 @@ router.post('/:id/cards', cardCreateLimiter, async (req, res) => {
     } else {
       aiFailed = true;
       aiLimited = true;
+      logEvent('ai.limited', { userId: req.userId, deckId: deck._id, source: 'create' });
     }
   }
 

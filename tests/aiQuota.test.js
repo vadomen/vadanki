@@ -119,7 +119,12 @@ describe('POST /api/cards/:id/regenerate', () => {
     const res = await regenerate(ctx, cardId);
     expect(res.status).toBe(200);
     expect(res.body.back).toBe('<b>hola</b><br><i>¡Hola!</i>');
-    expect(translateWord).toHaveBeenCalledWith('hello', 'en', 'es');
+    expect(translateWord).toHaveBeenCalledWith(
+      'hello',
+      'en',
+      'es',
+      expect.objectContaining({ source: 'regenerate' }),
+    );
   });
 
   it("404s for another user's card", async () => {
