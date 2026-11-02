@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../server.js';
+import mongoose from 'mongoose';
 import Card from '../models/Card.js';
 import { setup, teardown, clearDB } from './setup.js';
 
@@ -75,6 +76,71 @@ describe('GET /api/study/:deckId', () => {
     const res = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie).expect(200);
     expect(res.body.due).toHaveLength(0);
     expect(res.body.new).toHaveLength(0);
+  });
+});
+
+describe('daily new-card cap', () => {
+  async function deckWithCards(n, newPerDay) {
+    const cookie = (
+      await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'cap@example.com', password: 'password123' })
+    ).headers['set-cookie'];
+    const deck = await request(app)
+      .post('/api/decks')
+      .set('Cookie', cookie)
+      .send({ name: 'Cap', newPerDay });
+    const ids = [];
+    for (let i = 0; i < n; i++) {
+      const card = await request(app)
+        .post(`/api/decks/${deck.body._id}/cards`)
+        .set('Cookie', cookie)
+        .send({ front: `w${i}`, back: 'x' });
+      ids.push(card.body._id);
+    }
+    const review = (id, grade) =>
+      request(app).post(`/api/study/${id}/review`).set('Cookie', cookie).send({ grade });
+    return { cookie, deckId: deck.body._id, ids, review };
+  }
+
+  const lastWeek = () => new Date(Date.now() - 7 * 86400000);
+
+  // Regression: the cap only counted cards *created* today, so cards added on
+  // earlier days were served without limit on every visit.
+  it('applies newPerDay to cards created on earlier days', async () => {
+    const { cookie, deckId, review } = await deckWithCards(3, 2);
+    // raw driver update: Mongoose treats createdAt as immutable
+    await Card.collection.updateMany(
+      { deckId: new mongoose.Types.ObjectId(deckId) },
+      { $set: { createdAt: lastWeek() } },
+    );
+
+    const first = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie);
+    expect(first.body.new).toHaveLength(2);
+    for (const c of first.body.new) await review(c._id, 'good');
+
+    const second = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie);
+    expect(second.body.new).toHaveLength(0);
+  });
+
+  it('does not count due reviews against the new-card cap', async () => {
+    const { cookie, deckId, ids, review } = await deckWithCards(2, 1);
+    // ids[0] was introduced on an earlier day and is reviewed again today
+    await review(ids[0], 'good');
+    await Card.updateOne({ _id: ids[0] }, { $set: { introducedAt: lastWeek() } });
+    await makeOverdue(ids[0]);
+    await review(ids[0], 'good');
+
+    const res = await request(app).get(`/api/study/${deckId}`).set('Cookie', cookie);
+    expect(res.body.new.map((c) => c._id)).toEqual([ids[1]]);
+  });
+
+  it('sets introducedAt only on the first review', async () => {
+    const { ids, review } = await deckWithCards(1, 20);
+    const r1 = await review(ids[0], 'again');
+    const r2 = await review(ids[0], 'good');
+    expect(r1.body.introducedAt).toBeTruthy();
+    expect(r2.body.introducedAt).toBe(r1.body.introducedAt);
   });
 });
 

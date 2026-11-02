@@ -198,6 +198,38 @@ async function initDecks() {
 
 let decksById = {};
 
+// Stacked bar: Easy · Good (learned) · Hard · Again · never shown (track).
+const PROGRESS_SEGMENTS = [
+  ['easy', 'Easy'],
+  ['good', 'Good'],
+  ['hard', 'Hard'],
+  ['again', 'Again'],
+  ['unseen', 'Not shown yet'],
+];
+
+function renderDeckProgress(d) {
+  const b = d.breakdown ?? { unseen: d.total };
+  const pct = (n) => (n / d.total) * 100;
+  const bar = PROGRESS_SEGMENTS.filter(([k]) => k !== 'unseen' && b[k] > 0)
+    .map(
+      ([k, label]) =>
+        `<div class="seg seg-${k}" style="width:${pct(b[k])}%" title="${label}: ${b[k]}"></div>`,
+    )
+    .join('');
+  const legend = PROGRESS_SEGMENTS.filter(([k]) => b[k] > 0)
+    .map(
+      ([k, label]) =>
+        `<span class="legend-item"><i class="dot seg-${k}"></i>${label} ${b[k]}</span>`,
+    )
+    .join('');
+  return `
+          <div class="deck-progress" title="Learned = last review graded Good or Easy">
+            <div class="progress-bar deck-progress-bar stacked">${bar}</div>
+            <span class="deck-progress-label">${d.learned}/${d.total} learned</span>
+          </div>
+          <div class="deck-legend">${legend}</div>`;
+}
+
 async function loadDecks() {
   const list = document.getElementById('decks-list');
   const decks = await api.get('/api/decks');
@@ -219,17 +251,13 @@ async function loadDecks() {
           <div class="deck-meta">${esc(d.sourceLang)} → ${esc(d.targetLang)}</div>
           <div class="deck-stats">
             ${d.due > 0 ? `<span class="badge badge-due">${d.due} due</span>` : ''}
+            ${d.newAvailable > 0 ? `<span class="badge badge-new">${d.newAvailable} new</span>` : ''}
             <span class="badge badge-total">${d.total} ${d.total === 1 ? 'card' : 'cards'}</span>
           </div>
           ${
             d.total > 0
               ? `
-          <div class="deck-progress" title="Cards whose last review was graded Good or Easy">
-            <div class="progress-bar deck-progress-bar">
-              <div class="progress-fill" style="width:${Math.round((d.learned / d.total) * 100)}%"></div>
-            </div>
-            <span class="deck-progress-label">${d.learned}/${d.total} learned</span>
-          </div>`
+          ${renderDeckProgress(d)}`
               : ''
           }
         </div>

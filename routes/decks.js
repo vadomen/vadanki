@@ -6,20 +6,21 @@ import { requireAuth } from '../middleware/auth.js';
 import { translateWord } from '../services/geminiService.js';
 import { tryConsumeAiQuota, AI_MAX_FRONT_LENGTH } from '../services/aiQuota.js';
 import { serializeCSV, parseCSV } from '../services/csv.js';
+import { startOfDay } from '../services/day.js';
+import { LEARNED_GRADES, countIntroducedToday, gradeBreakdown } from '../services/deckStats.js';
 
 const router = express.Router();
 router.use(requireAuth);
 
-// GET /api/decks — list decks with new/due/total card counts
+// GET /api/decks — list decks with new/due/total/learned card counts
 router.get('/', async (req, res) => {
   const decks = await Deck.find({ userId: req.userId }).lean();
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStart = startOfDay(now);
 
   const counts = await Promise.all(
     decks.map(async (deck) => {
-      const [total, due, newToday, learned] = await Promise.all([
-        Card.countDocuments({ deckId: deck._id, userId: req.userId }),
+      const [due, newToday, breakdown, introducedToday] = await Promise.all([
         // Must match the due query in routes/study.js — lastReviewedAt, not
         // repetitions, which SM-2 resets to 0 on "again".
         Card.countDocuments({
@@ -33,20 +34,17 @@ router.get('/', async (req, res) => {
           userId: req.userId,
           createdAt: { $gte: todayStart },
         }),
-        // "Learned" = last grade good/easy. Cards reviewed before lastGrade
-        // existed (null but repetitions > 0) count too — SM-2 resets
-        // repetitions on "again", so they passed their last review; the
-        // approximation self-corrects as cards get reviewed again.
-        Card.countDocuments({
-          deckId: deck._id,
-          userId: req.userId,
-          $or: [
-            { lastGrade: { $in: ['good', 'easy'] } },
-            { lastGrade: null, repetitions: { $gt: 0 } },
-          ],
-        }),
+        gradeBreakdown(deck._id, req.userId),
+        countIntroducedToday(deck._id, req.userId, todayStart),
       ]);
-      return { ...deck, total, due, newToday, learned };
+      const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+      const learned = LEARNED_GRADES.reduce((sum, g) => sum + breakdown[g], 0);
+      // New cards the study queue would serve right now (same cap as study.js)
+      const newAvailable = Math.min(
+        breakdown.unseen,
+        Math.max(0, deck.newPerDay - introducedToday),
+      );
+      return { ...deck, total, due, newToday, learned, breakdown, newAvailable };
     }),
   );
 

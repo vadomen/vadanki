@@ -366,6 +366,10 @@ body {
   background: #fff5f5;
   color: var(--again);
 }
+.badge-new {
+  background: #eef0fd;
+  color: var(--primary);
+}
 .badge-total {
   background: var(--bg);
   color: var(--muted);
@@ -894,8 +898,54 @@ body {
   height: 5px;
   margin-bottom: 0;
 }
-.deck-progress .progress-fill {
+.deck-progress-bar.stacked {
+  display: flex;
+  flex: 0 1 260px;
+  width: 260px;
+  height: 8px;
+  max-width: 260px;
+  border-radius: 4px;
+}
+.seg {
+  height: 100%;
+}
+.seg + .seg {
+  border-left: 1px solid var(--card-bg);
+}
+.seg-easy {
+  background: var(--easy);
+}
+.seg-good {
   background: var(--good);
+}
+.seg-hard {
+  background: var(--hard);
+}
+.seg-again {
+  background: var(--again);
+}
+.seg-unseen {
+  background: var(--border);
+}
+.deck-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.8rem;
+  margin-top: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
 .deck-progress-label {
   font-size: 0.78rem;

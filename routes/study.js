@@ -3,6 +3,8 @@ import Card from '../models/Card.js';
 import Deck from '../models/Deck.js';
 import { requireAuth } from '../middleware/auth.js';
 import { applyGrade } from '../services/sm2.js';
+import { startOfDay } from '../services/day.js';
+import { countIntroducedToday, newCardsFilter } from '../services/deckStats.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -13,7 +15,7 @@ router.get('/:deckId', async (req, res) => {
   if (!deck) return res.status(404).json({ error: 'Deck not found' });
 
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStart = startOfDay(now);
 
   // Due cards (already reviewed at least once, overdue). Keyed off
   // lastReviewedAt, not repetitions: SM-2 resets repetitions to 0 on "again",
@@ -26,26 +28,19 @@ router.get('/:deckId', async (req, res) => {
     lastReviewedAt: { $ne: null },
   }).sort({ dueDate: 1 });
 
-  // New cards introduced today so far
-  const newSeenToday = await Card.countDocuments({
-    deckId: deck._id,
-    userId: req.userId,
-    repetitions: { $gt: 0 },
-    lastReviewedAt: { $gte: todayStart },
-    createdAt: { $gte: todayStart },
-  });
+  // New cards introduced (first reviewed) today so far, whenever they were
+  // created. Keyed off introducedAt so due reviews don't eat the new-card cap.
+  const introducedToday = await countIntroducedToday(deck._id, req.userId, todayStart);
 
-  const newSlots = Math.max(0, deck.newPerDay - newSeenToday);
+  const newSlots = Math.max(0, deck.newPerDay - introducedToday);
 
-  // New cards (never reviewed), capped by remaining daily quota
-  const newCards = await Card.find({
-    deckId: deck._id,
-    userId: req.userId,
-    repetitions: 0,
-    lastReviewedAt: null,
-  })
-    .sort({ createdAt: 1 })
-    .limit(newSlots);
+  // New cards (never reviewed), capped by remaining daily quota. Skip the
+  // query at 0: MongoDB treats limit(0) as "no limit" and would return every
+  // new card in the deck once the daily cap is reached.
+  const newCards =
+    newSlots > 0
+      ? await Card.find(newCardsFilter(deck._id, req.userId)).sort({ createdAt: 1 }).limit(newSlots)
+      : [];
 
   res.json({
     due,
@@ -64,9 +59,11 @@ router.post('/:cardId/review', async (req, res) => {
   const card = await Card.findOne({ _id: req.params.cardId, userId: req.userId });
   if (!card) return res.status(404).json({ error: 'Card not found' });
 
+  const firstReview = !card.lastReviewedAt;
   const updates = applyGrade(card, grade);
   Object.assign(card, updates);
   card.lastGrade = grade;
+  if (firstReview) card.introducedAt = updates.lastReviewedAt;
   await card.save();
 
   res.json(card);

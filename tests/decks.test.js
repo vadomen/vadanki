@@ -74,7 +74,7 @@ describe('Decks CRUD', () => {
     await request(app).get('/api/decks').expect(401);
   });
 
-  it('counts cards last graded good or easy as learned', async () => {
+  it('counts only cards last graded good/easy as learned and reports a breakdown', async () => {
     const deck = await request(app)
       .post('/api/decks')
       .set('Cookie', cookie)
@@ -82,7 +82,7 @@ describe('Decks CRUD', () => {
     const deckId = deck.body._id;
 
     const cardIds = [];
-    for (const front of ['uno', 'dos', 'tres']) {
+    for (const front of ['uno', 'dos', 'tres', 'cuatro', 'cinco']) {
       const card = await request(app)
         .post(`/api/decks/${deckId}/cards`)
         .set('Cookie', cookie)
@@ -90,29 +90,53 @@ describe('Decks CRUD', () => {
       cardIds.push(card.body._id);
     }
 
-    // good + easy → learned; again → not learned; grades overwrite each other
-    await request(app)
-      .post(`/api/study/${cardIds[0]}/review`)
-      .set('Cookie', cookie)
-      .send({ grade: 'good' });
-    await request(app)
-      .post(`/api/study/${cardIds[1]}/review`)
-      .set('Cookie', cookie)
-      .send({ grade: 'easy' });
-    await request(app)
-      .post(`/api/study/${cardIds[2]}/review`)
-      .set('Cookie', cookie)
-      .send({ grade: 'good' });
-    const regraded = await request(app)
-      .post(`/api/study/${cardIds[2]}/review`)
-      .set('Cookie', cookie)
-      .send({ grade: 'again' });
-    expect(regraded.body.lastGrade).toBe('again');
+    const review = (id, grade) =>
+      request(app).post(`/api/study/${id}/review`).set('Cookie', cookie).send({ grade });
+
+    // good/easy -> learned; hard/again -> not learned; grades overwrite each
+    // other (cardIds[3]: good then hard); cardIds[4] is never reviewed
+    await review(cardIds[0], 'good');
+    await review(cardIds[1], 'easy');
+    await review(cardIds[2], 'again');
+    await review(cardIds[3], 'good');
+    const regraded = await review(cardIds[3], 'hard');
+    expect(regraded.body.lastGrade).toBe('hard');
 
     const res = await request(app).get('/api/decks').set('Cookie', cookie).expect(200);
     const progress = res.body.find((d) => d._id === deckId);
-    expect(progress.total).toBe(3);
+    expect(progress.total).toBe(5);
     expect(progress.learned).toBe(2);
+    expect(progress.breakdown).toEqual({ easy: 1, good: 1, hard: 1, again: 1, unseen: 1 });
+  });
+
+  it('reports new cards available today, capped by newPerDay', async () => {
+    const deck = await request(app)
+      .post('/api/decks')
+      .set('Cookie', cookie)
+      .send({ name: 'New', newPerDay: 2 });
+    const deckId = deck.body._id;
+
+    const ids = [];
+    for (const front of ['a', 'b', 'c']) {
+      const card = await request(app)
+        .post(`/api/decks/${deckId}/cards`)
+        .set('Cookie', cookie)
+        .send({ front, back: 'x' });
+      ids.push(card.body._id);
+    }
+
+    const review = (id, grade) =>
+      request(app).post(`/api/study/${id}/review`).set('Cookie', cookie).send({ grade });
+    const newAvailable = async () =>
+      (await request(app).get('/api/decks').set('Cookie', cookie)).body.find(
+        (d) => d._id === deckId,
+      ).newAvailable;
+
+    expect(await newAvailable()).toBe(2);
+    await review(ids[0], 'good');
+    expect(await newAvailable()).toBe(1);
+    await review(ids[1], 'again');
+    expect(await newAvailable()).toBe(0);
   });
 
   // Regression: the due count must stay in step with the study queue — a
