@@ -6,11 +6,11 @@ const PASS = 'password123';
 
 const br = await chromium.launch({ headless: true });
 const page = await br.newPage();
-page.on('console', m => console.log('[browser]', m.text()));
+page.on('console', (m) => console.log('[browser]', m.text()));
 
 let ok = true;
 function check(label, cond) {
-  console.log((cond ? '✅' : '❌'), label);
+  console.log(cond ? '✅' : '❌', label);
   if (!cond) ok = false;
 }
 

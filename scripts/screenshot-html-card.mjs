@@ -28,10 +28,7 @@ const csv = `Front,Back
 "One-off","<b>Одноразовий, унікальний (випадок/проєкт), експрес-завдання</b><br><i>This isn't a permanent task, just a one-off request from the CEO.</i>"`;
 
 // Upload via file chooser
-const [fc] = await Promise.all([
-  page.waitForEvent('filechooser'),
-  page.click('.io-import-label'),
-]);
+const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.io-import-label')]);
 await fc.setFiles([{ name: 'vocab.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) }]);
 
 await page.waitForSelector('.card-row', { timeout: 6000 });

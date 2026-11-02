@@ -5,14 +5,14 @@ translation and an example sentence when you add a word.
 
 ## 1. Stack
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Runtime/framework | Node.js + Express 5 | Single service serves API + static frontend |
-| Database | MongoDB Atlas (free M0) via Mongoose | ~512 MB free forever |
-| AI | Google Gemini, `gemini-2.5-flash` via `@google/genai` | Flash is free-tier; Pro is paid-only since Apr 2026 |
-| Frontend | Plain HTML/CSS/vanilla JS (served as static files) | Keep MVP simple; can swap to React later |
-| Auth | email + password, bcrypt hash, JWT (httpOnly cookie) | |
-| Host | Render free web service | Sleeps after 15 min idle (~30–50s cold start) |
+| Layer             | Choice                                                | Notes                                               |
+| ----------------- | ----------------------------------------------------- | --------------------------------------------------- |
+| Runtime/framework | Node.js + Express 5                                   | Single service serves API + static frontend         |
+| Database          | MongoDB Atlas (free M0) via Mongoose                  | ~512 MB free forever                                |
+| AI                | Google Gemini, `gemini-2.5-flash` via `@google/genai` | Flash is free-tier; Pro is paid-only since Apr 2026 |
+| Frontend          | Plain HTML/CSS/vanilla JS (served as static files)    | Keep MVP simple; can swap to React later            |
+| Auth              | email + password, bcrypt hash, JWT (httpOnly cookie)  |                                                     |
+| Host              | Render free web service                               | Sleeps after 15 min idle (~30–50s cold start)       |
 
 ## 2. Architecture
 
@@ -39,32 +39,34 @@ Card  { _id, deckId(ref), userId(ref), front, back, exampleSentence,
         ease (default 2.5), interval (days, default 0), repetitions (default 0),
         dueDate (default now), lastReviewedAt, createdAt }
 ```
+
 Indexes: `Card { userId, deckId, dueDate }` for fast due-card queries; `User { email }` unique.
 
 ## 4. API Routes
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | /api/auth/register | create user |
-| POST | /api/auth/login | set JWT cookie |
-| POST | /api/auth/logout | clear cookie |
-| GET | /api/decks | list decks with new/due/total counts |
-| POST | /api/decks | create deck |
-| PATCH | /api/decks/:id | rename / settings |
-| DELETE | /api/decks/:id | delete deck + its cards |
-| GET | /api/decks/:id/cards | list cards in deck |
-| POST | /api/decks/:id/cards | create card → calls Gemini for back + example |
-| PATCH | /api/cards/:id | edit card |
-| DELETE | /api/cards/:id | delete card |
-| GET | /api/study/:deckId | next batch of due + new cards |
-| POST | /api/study/:cardId/review | body `{ grade: again\|hard\|good\|easy }` → SM-2 update |
-| GET | /healthz | uptime/keep-alive ping |
+| Method | Path                      | Purpose                                                 |
+| ------ | ------------------------- | ------------------------------------------------------- |
+| POST   | /api/auth/register        | create user                                             |
+| POST   | /api/auth/login           | set JWT cookie                                          |
+| POST   | /api/auth/logout          | clear cookie                                            |
+| GET    | /api/decks                | list decks with new/due/total counts                    |
+| POST   | /api/decks                | create deck                                             |
+| PATCH  | /api/decks/:id            | rename / settings                                       |
+| DELETE | /api/decks/:id            | delete deck + its cards                                 |
+| GET    | /api/decks/:id/cards      | list cards in deck                                      |
+| POST   | /api/decks/:id/cards      | create card → calls Gemini for back + example           |
+| PATCH  | /api/cards/:id            | edit card                                               |
+| DELETE | /api/cards/:id            | delete card                                             |
+| GET    | /api/study/:deckId        | next batch of due + new cards                           |
+| POST   | /api/study/:cardId/review | body `{ grade: again\|hard\|good\|easy }` → SM-2 update |
+| GET    | /healthz                  | uptime/keep-alive ping                                  |
 
 Every query is scoped by the authenticated `userId`.
 
 ## 5. SM-2 Scheduling
 
 On review, map grade → quality `q` (again=0, hard=3, good=4, easy=5).
+
 - If `q < 3`: `repetitions = 0`, `interval = 1` (card relapses, shown again soon).
 - Else: `repetitions += 1`; interval = 1 (rep 1), 6 (rep 2), else `round(interval * ease)`.
 - Update ease: `ease = max(1.3, ease + (0.1 - (5-q)*(0.08 + (5-q)*0.02)))`.
@@ -74,9 +76,10 @@ On review, map grade → quality `q` (again=0, hard=3, good=4, easy=5).
 ## 6. Gemini Integration
 
 `services/geminiService.js` exports `translateWord(word, sourceLang, targetLang)`:
+
 - Calls `gemini-2.5-flash` with a prompt instructing **JSON-only** output:
   `{ "translation": "...", "exampleSentence": "..." }`.
-- Parse defensively: strip ``` fences, `JSON.parse` inside try/catch.
+- Parse defensively: strip ```fences,`JSON.parse` inside try/catch.
 - On any failure (quota/network), return `null` so the route still lets the user save the
   card with a manually entered back. One Gemini call per card creation.
 - Key from `process.env.GEMINI_API_KEY`. Light rate-limit on the create-card endpoint.

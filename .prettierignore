@@ -1,2 +1,4 @@
 node_modules/
 coverage/
+# Agent tooling config (not app code)
+.claude/
